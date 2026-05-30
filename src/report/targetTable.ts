@@ -3,6 +3,11 @@ import { displayFlag } from "../improve/flagsShort.js";
 
 const SCORE_MAX = 100;
 
+/** Horizontal padding inside each cell (more = less cramped). */
+const CELL_PAD = 2;
+
+const MIN_COL_WIDTHS = [26, 10, 10] as const; // id, score, flag
+
 function padCell(text: string, width: number, align: "left" | "center" = "left"): string {
   const w = Math.max(width, text.length);
   if (align === "center") {
@@ -13,16 +18,33 @@ function padCell(text: string, width: number, align: "left" | "center" = "left")
   return text.padEnd(w);
 }
 
-function tableRow(cells: string[], widths: number[], aligns: ("left" | "center")[]): string {
-  const parts = cells.map((c, i) => ` ${padCell(c, widths[i], aligns[i])} `);
+function cellBlock(text: string, contentWidth: number, align: "left" | "center"): string {
+  const inner = padCell(text, contentWidth, align);
+  return `${" ".repeat(CELL_PAD)}${inner}${" ".repeat(CELL_PAD)}`;
+}
+
+function blockWidth(contentWidth: number): number {
+  return contentWidth + CELL_PAD * 2;
+}
+
+function tableRow(cells: string[], contentWidths: number[], aligns: ("left" | "center")[]): string {
+  const parts = cells.map((c, i) => cellBlock(c, contentWidths[i], aligns[i]));
   return `│${parts.join("│")}│`;
 }
 
-function tableSeparator(widths: number[]): string {
-  return `├${widths.map((w) => "─".repeat(w + 2)).join("┼")}┤`;
+function tableTop(contentWidths: number[]): string {
+  return `┌${contentWidths.map((w) => "─".repeat(blockWidth(w))).join("┬")}┐`;
 }
 
-/** Box-drawing table: id | score | flag (same style as /metamorph). */
+function tableMid(contentWidths: number[]): string {
+  return `├${contentWidths.map((w) => "─".repeat(blockWidth(w))).join("┼")}┤`;
+}
+
+function tableBottom(contentWidths: number[]): string {
+  return `└${contentWidths.map((w) => "─".repeat(blockWidth(w))).join("┴")}┘`;
+}
+
+/** Box-drawing table with top/bottom borders and relaxed column spacing. */
 export function formatAsciiTargetTable(title: string, targets: AgentProfile[]): string[] {
   if (targets.length === 0) return [];
 
@@ -33,20 +55,24 @@ export function formatAsciiTargetTable(title: string, targets: AgentProfile[]): 
     flag: displayFlag(t.flags),
   }));
 
-  const widths = [
-    Math.max(2, ...rows.map((r) => r.id.length), "id".length),
-    Math.max(5, ...rows.map((r) => r.score.length), "score".length),
-    Math.max(4, ...rows.map((r) => r.flag.length), "flag".length),
+  const contentWidths = [
+    Math.max(MIN_COL_WIDTHS[0], ...rows.map((r) => r.id.length), "id".length),
+    Math.max(MIN_COL_WIDTHS[1], ...rows.map((r) => r.score.length), "score".length),
+    Math.max(MIN_COL_WIDTHS[2], ...rows.map((r) => r.flag.length), "flag".length),
   ];
-  const aligns: ("left" | "center")[] = ["left", "left", "left"];
+
+  const headerAlign: ("left" | "center")[] = ["center", "center", "center"];
+  const rowAlign: ("left" | "center")[] = ["left", "center", "center"];
 
   const lines = [`## ${title} (${sorted.length})`, ""];
 
-  lines.push(tableRow(["id", "score", "flag"], widths, ["center", "center", "center"]));
-  lines.push(tableSeparator(widths));
+  lines.push(tableTop(contentWidths));
+  lines.push(tableRow(["id", "score", "flag"], contentWidths, headerAlign));
+  lines.push(tableMid(contentWidths));
   for (const r of rows) {
-    lines.push(tableRow([r.id, r.score, r.flag], widths, aligns));
+    lines.push(tableRow([r.id, r.score, r.flag], contentWidths, rowAlign));
   }
+  lines.push(tableBottom(contentWidths));
   lines.push("");
 
   return lines;

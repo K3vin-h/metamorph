@@ -30,12 +30,14 @@ Rules:
 - Do **not** summarize or skip rows.
 - Preserve box-drawing lines exactly (`│`, `├`, `┼`, `┤`, `─`).
 
-Expected table shape:
+Expected table shape (full box, spaced cells):
 
 ```
-│ id                   │ score  │ flag  │
-├──────────────────────┼────────┼───────┤
-│ backend-patterns     │ 40/100 │ never │
+┌──────────────────────────────┬──────────────┬──────────────┐
+│              id              │    score     │     flag     │
+├──────────────────────────────┼──────────────┼──────────────┤
+│  backend-patterns            │    40/100    │    never     │
+└──────────────────────────────┴──────────────┴──────────────┘
 ```
 
 If `report-refresh` succeeded but the file is missing, say so and suggest running a session.
