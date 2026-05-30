@@ -31,25 +31,43 @@ Print a compact summary:
 ```
 metamorph · <sessionCount> sessions analyzed
 Tools: <toolCalls> · Agents: <agentRuns> runs · Skills: <skillLoads> loads
+Warm-up: <sessionCount>/<warmupSessions> ✓
 ```
-Then list warm-up status: `Warm-up: <sessionCount>/<warmupSessions>` (show even if met — gives context).
+Use the same compact line style for all three lines. Do not add extra blank lines inside this summary block.
 
 **Step 3 — List targets and ask for selection.**
-Print all available targets with scores:
+Print available targets as consistent grouped tables. Do not print long inline lists separated by `·`; they wrap badly. Use the exact structure below for both agents and skills:
 
 ```
-Agents:
-  architect (10) · build-error-resolver (10) · code-reviewer (10) · ...
+Agents
+ID                         Score  Status
+architect                     10  never invoked
+build-error-resolver          10  never invoked
+researcher                    40  rarely used
 
-Skills:
-  backend-patterns (40) · tdd-workflow (40) · ...
+Skills
+ID                         Score  Status
+backend-patterns              40  never invoked
+tdd-workflow                  40  never invoked
+verification-loop             40  never invoked
 
 CLAUDE.md:
-  global (~/.claude/CLAUDE.md) · local (.claude/CLAUDE.md if exists)
+ID                         Scope
+global                     ~/.claude/CLAUDE.md
+local                      .claude/CLAUDE.md
 
 Which targets do you want to improve?
 Enter IDs (e.g. "architect tdd-guide"), "top 3", "top N", or "all":
 ```
+
+Formatting rules:
+- Agents and skills must use the same columns: `ID`, `Score`, `Status`.
+- Sort each section by score ascending, then ID alphabetically.
+- Show every available target, one per line.
+- Convert flag labels to readable status text: `never-invoked-agent` → `never invoked`, `never-applied-skill` → `never invoked`, `rarely-used-agent` → `rarely used`, `unused-tool` → `unused tool`, `hot-path` → `hot path`, no flags → `ok`.
+- Keep columns aligned with spaces inside a fenced code block.
+- Do not group with phrases like "all score 10"; the score column already shows that.
+- Do not use inline dot-separated lists for target output.
 
 Wait for the user's response. Parse the selection:
 - IDs: match against agent ids, skill ids, "global", "local", "claudemd"

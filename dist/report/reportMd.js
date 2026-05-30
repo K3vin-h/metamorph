@@ -37,39 +37,31 @@ exports.generateReportMd = generateReportMd;
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const config_js_1 = require("../config.js");
-function shortFlagLabel(flags) {
+function statusLabel(flags) {
     if (flags.length === 0)
         return "ok";
     const f = flags[0];
     switch (f.type) {
-        case "never-invoked-agent": return "never-invoked";
-        case "rarely-used-agent": return "rarely-used";
-        case "hot-path": return "hot-path";
-        case "dead-section": return "dead-section";
-        case "low-confidence-dead-section": return "low-confidence-dead-section";
-        case "unused-tool": return `unused-tool:${f.target ?? ""}`;
-        case "never-applied-skill": return "never-applied";
-        default: return f.type;
+        case "never-invoked-agent": return "never invoked";
+        case "never-applied-skill": return "never invoked";
+        case "rarely-used-agent": return "rarely used";
+        case "unused-tool": return f.target ? `unused tool: ${f.target}` : "unused tool";
+        case "dead-section": return "dead section";
+        case "low-confidence-dead-section": return "possible dead section";
+        case "hot-path": return "hot path";
     }
 }
-function groupByFlag(targets) {
-    const groups = new Map();
-    for (const t of targets) {
-        const label = shortFlagLabel(t.flags);
-        if (!groups.has(label))
-            groups.set(label, { ids: [], scores: [] });
-        const g = groups.get(label);
-        g.ids.push(t.id);
-        g.scores.push(t.score);
+function targetTable(title, targets) {
+    if (targets.length === 0)
+        return [];
+    const sorted = [...targets].sort((a, b) => a.score - b.score || a.id.localeCompare(b.id));
+    const idWidth = Math.max("ID".length, ...sorted.map((t) => t.id.length));
+    const lines = [`## ${title}`, "", "```", `${"ID".padEnd(idWidth)}  Score  Status`];
+    for (const t of sorted) {
+        lines.push(`${t.id.padEnd(idWidth)}  ${String(t.score).padStart(5)}  ${statusLabel(t.flags)}`);
     }
-    return groups;
-}
-function median(scores) {
-    const sorted = [...scores].sort((a, b) => a - b);
-    const mid = Math.floor(sorted.length / 2);
-    return sorted.length % 2 === 0
-        ? Math.round((sorted[mid - 1] + sorted[mid]) / 2)
-        : sorted[mid];
+    lines.push("```", "");
+    return lines;
 }
 function generateReportMd(pluginRoot, analysis) {
     const config = (0, config_js_1.loadConfig)(pluginRoot);
@@ -89,24 +81,8 @@ function generateReportMd(pluginRoot, analysis) {
         lines.push(`Languages: ${langStr}`);
         lines.push("");
     }
-    // Agents grouped by flag
-    if (agents.length > 0) {
-        lines.push("## Agents");
-        const groups = groupByFlag(agents.sort((a, b) => a.score - b.score));
-        for (const [label, { ids, scores }] of groups) {
-            lines.push(`${label} (${median(scores)}): ${ids.join(", ")}`);
-        }
-        lines.push("");
-    }
-    // Skills grouped by flag
-    if (skills.length > 0) {
-        lines.push("## Skills");
-        const groups = groupByFlag(skills.sort((a, b) => a.score - b.score));
-        for (const [label, { ids, scores }] of groups) {
-            lines.push(`${label} (${median(scores)}): ${ids.join(", ")}`);
-        }
-        lines.push("");
-    }
+    lines.push(...targetTable("Agents", agents));
+    lines.push(...targetTable("Skills", skills));
     const actionLine = warmupMet
         ? "Run /metamorph for suggestions · Target any: /metamorph --target <id> · View: /metamorph-report"
         : "Suggestions unlock after warm-up · Target any: /metamorph --target <id> · View: /metamorph-report";
