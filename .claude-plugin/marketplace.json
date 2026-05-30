@@ -1,0 +1,10 @@
+{
+  "name": "metamorph",
+  "version": "0.1.0",
+  "description": "Observes your actual usage patterns across agents, skills, and CLAUDE.md. Computes utilization scores, generates a habits dashboard, and proposes targeted improvements — all suggest-only, you approve every change.",
+  "author": "Kevin",
+  "homepage": "https://github.com/K3vin-h/metamorph",
+  "pluginFile": "plugin.json",
+  "keywords": ["agents", "skills", "improvement", "analytics", "habits"],
+  "license": "MIT"
+}

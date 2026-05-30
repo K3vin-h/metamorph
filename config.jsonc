@@ -1,0 +1,41 @@
+{
+  "mode": "suggest",
+  "warmupSessions": 5,
+  "maxSuggestionsPerRun": 3,
+  "flagThreshold": 40,
+  "read": {
+    "scope": "both",
+    "transcripts": "redacted",
+    "denyGlobs": [
+      "projects/**/secrets*",
+      "**/*.env*",
+      "**/.env",
+      "**/credentials*"
+    ]
+  },
+  "write": {
+    "targets": {
+      "agents": true,
+      "skills": true,
+      "claudeMd": false
+    },
+    "allow": [
+      "agents/*",
+      "skills/*/SKILL.md"
+    ],
+    "deny": []
+  },
+  "style": {
+    "deriveGuide": true,
+    "preserveSkeleton": true
+  },
+  "trackers": [
+    "agentFreq",
+    "toolMix",
+    "langs",
+    "deadWeight",
+    "timeOfDay",
+    "acceptReject",
+    "modelUse"
+  ]
+}

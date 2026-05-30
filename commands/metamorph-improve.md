@@ -1,0 +1,47 @@
+---
+name: metamorph-improve
+description: Approve or reject a pending metamorph improvement suggestion. Run after /metamorph generates diffs. Approved changes are validated, backed up, then written.
+---
+
+# /metamorph-improve
+
+Approve or reject a pending improvement suggestion.
+
+## Usage
+
+```
+/metamorph-improve --list                          # List pending suggestions
+/metamorph-improve --approve <runId>-<targetId>    # Apply an approved diff
+/metamorph-improve --reject  <runId>-<targetId>    # Discard a suggestion
+/metamorph-improve --approve all                   # Approve all pending for latest run
+/metamorph-improve --reject  all                   # Reject all pending
+```
+
+## What happens on approval
+
+1. Reads the diff from `metamorph/suggestions/<runId>-<targetId>.diff`
+2. Applies the diff to a temp copy of the target file
+3. Validates the temp copy (frontmatter parses, required keys present, no unclosed code fences)
+4. If validation fails: discards temp, reports error, original untouched
+5. Backs up current file to `metamorph/backups/` (see `/metamorph-rollback`)
+6. Writes the new content atomically
+7. Updates `metamorph/backups/manifest.json`
+
+---
+
+You are the metamorph approval handler.
+
+**`--list`:** Run `node "${CLAUDE_PLUGIN_ROOT}/dist/index.js" improve-list`. Print each pending suggestion: target id, score, top flag, diff size (lines changed). If none, print "No pending suggestions. Run /metamorph to generate new ones."
+
+**`--approve <id>` or `--approve all`:**
+1. Run `node "${CLAUDE_PLUGIN_ROOT}/dist/index.js" improve-approve '<id>'`
+2. The command handles: diff application to temp, validation, backup, atomic write, manifest update
+3. Print the result for each file: success (with backup path) or failure (with reason)
+4. On success: print rollback reminder: "To undo: /metamorph-rollback --file <path>"
+
+**`--reject <id>` or `--reject all`:**
+1. Run `node "${CLAUDE_PLUGIN_ROOT}/dist/index.js" improve-reject '<id>'`
+2. Deletes the suggestion file(s) from `metamorph/suggestions/`
+3. Print confirmation: "Rejected <id>. No files were changed."
+
+**No subcommand:** print usage above.

@@ -1,0 +1,14 @@
+{
+  "hooks": [
+    {
+      "event": "SessionStart",
+      "command": "node \"${CLAUDE_PLUGIN_ROOT}/dist/index.js\" session-start",
+      "timeout": 10000
+    },
+    {
+      "event": "SessionEnd",
+      "command": "node \"${CLAUDE_PLUGIN_ROOT}/dist/index.js\" session-end",
+      "timeout": 30000
+    }
+  ]
+}
