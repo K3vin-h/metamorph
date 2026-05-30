@@ -1,0 +1,9 @@
+node_modules/
+data/
+suggestions/
+report.md
+report.html
+*.log
+.DS_Store
+backups/*
+!backups/manifest.json
