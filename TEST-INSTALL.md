@@ -3,10 +3,10 @@
 End-to-end verification per PLAN.md (todo 13).
 
 - [ ] `/plugin marketplace add K3vin-h/metamorph` then `/plugin install metamorph`
-- [ ] Run `/metamorph setup` and confirm `config.jsonc` updates
+- [ ] Run `/metamorph setup` and confirm `${CLAUDE_PLUGIN_DATA}/config.jsonc` updates
 - [ ] Complete 5 sessions (warm-up); dashboard shows `warming up (n/5)`
 - [ ] After warm-up, `/metamorph` returns suggestions (top N targets)
-- [ ] `report.html` refreshes after SessionEnd; command-bridge buttons copy valid slash commands
+- [ ] `${CLAUDE_PLUGIN_DATA}/report.html` refreshes after SessionEnd; command-bridge buttons copy valid slash commands
 - [ ] Permissions: denied paths are skipped; deny globs win over allow
 - [ ] Privacy: `redacted` mode stores metadata only (no raw prompts/commands in `data/`)
 - [ ] Approve a suggestion via `/metamorph-improve --approve`; file validates and backup appears in `backups/`

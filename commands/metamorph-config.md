@@ -34,7 +34,7 @@ View or update individual config settings.
 
 You are the metamorph config manager.
 
-**If `$ARGUMENTS` starts with `show`:** Read `${CLAUDE_PLUGIN_ROOT}/config.jsonc`, print all current settings in a readable table. Note any values that differ from defaults.
+**If `$ARGUMENTS` starts with `show`:** Read `${CLAUDE_PLUGIN_DATA}/config.jsonc`, print all current settings in a readable table. Note any values that differ from defaults.
 
 **If `$ARGUMENTS` starts with `set KEY=VALUE`:**
 1. Parse the key path (dot-separated) and value from arguments
@@ -45,4 +45,4 @@ You are the metamorph config manager.
 
 **If no subcommand:** print the usage block above.
 
-All changes are immediately written to `config.jsonc` and take effect on the next session-end hook.
+All changes are immediately written to `${CLAUDE_PLUGIN_DATA}/config.jsonc` and take effect on the next session-end hook.

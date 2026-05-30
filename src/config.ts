@@ -118,6 +118,7 @@ export function loadConfig(pluginRoot: string): Config {
 export function writeConfig(pluginRoot: string, config: Config): void {
   const configPath = path.join(pluginRoot, "config.jsonc");
   const json = JSON.stringify(config, null, 2);
+  fs.mkdirSync(path.dirname(configPath), { recursive: true });
   fs.writeFileSync(configPath, json, "utf8");
 }
 

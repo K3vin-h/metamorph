@@ -1,6 +1,6 @@
 ---
 name: metamorph-setup
-description: Interactive setup wizard for metamorph. Configure read scope, write permissions, read privacy level, warm-up count, and flag threshold. Re-runnable at any time. All settings saved to metamorph/config.jsonc.
+description: Interactive setup wizard for metamorph. Configure read scope, write permissions, read privacy level, warm-up count, and flag threshold. Re-runnable at any time. All settings are saved to persistent plugin data.
 ---
 
 # /metamorph-setup
@@ -21,11 +21,11 @@ You are the metamorph setup wizard. Walk the user through each setting interacti
 Print a welcome banner:
 ```
 metamorph setup wizard
-Settings are saved to metamorph/config.jsonc
+Settings are saved to ${CLAUDE_PLUGIN_DATA}/config.jsonc
 Press Enter to keep the current value [shown in brackets]
 ```
 
-Read the current config from `${CLAUDE_PLUGIN_ROOT}/config.jsonc` (fall back to defaults if missing/invalid).
+Read the current config from `${CLAUDE_PLUGIN_DATA}/config.jsonc` (fall back to defaults if missing/invalid).
 
 Ask each question in order. For each, show the current value in brackets. Accept Enter to keep it.
 
@@ -84,10 +84,10 @@ After all questions, show a summary diff of changes and ask:
 Save these settings? [Y/n] 
 ```
 
-On confirm: write the updated config to `${CLAUDE_PLUGIN_ROOT}/config.jsonc` using `node "${CLAUDE_PLUGIN_ROOT}/dist/index.js" config-write '<json>'`.
+On confirm: write the updated config to `${CLAUDE_PLUGIN_DATA}/config.jsonc` using `node "${CLAUDE_PLUGIN_ROOT}/dist/index.js" config-write '<json>'`.
 
 Print confirmation:
 ```
-Settings saved to metamorph/config.jsonc
+Settings saved to ${CLAUDE_PLUGIN_DATA}/config.jsonc
 Run /metamorph to see your dashboard.
 ```

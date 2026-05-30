@@ -56,14 +56,14 @@ After setup, metamorph collects data for **5 sessions** (configurable) before of
 
 ## Data & privacy
 
-All data lives under `metamorph/data/`. Default privacy mode is `redacted` — only metadata is stored (tool names, file extensions, hashed path stems, timestamps). No raw file contents or prompt text are stored unless you switch to `full` mode.
+All runtime data lives under Claude Code's persistent plugin data directory (`${CLAUDE_PLUGIN_DATA}`, usually `~/.claude/plugins/data/<plugin-id>/`). Default privacy mode is `redacted` — only metadata is stored (tool names, file extensions, hashed path stems, timestamps). No raw file contents or prompt text are stored unless you switch to `full` mode.
 
 ## Files generated
 
-- `metamorph/report.md` — text dashboard, updated after every session
-- `metamorph/report.html` — interactive dashboard with inline SVG charts and command-bridge buttons
-- `metamorph/data/analysis.json` — compact utilization scores (the LLM reads only this)
-- `metamorph/backups/` — previous versions of metamorph-edited files (one-level rollback)
+- `${CLAUDE_PLUGIN_DATA}/report.md` — text dashboard, updated after every session
+- `${CLAUDE_PLUGIN_DATA}/report.html` — interactive dashboard with inline SVG charts and command-bridge buttons
+- `${CLAUDE_PLUGIN_DATA}/data/analysis.json` — compact utilization scores (the LLM reads only this)
+- `${CLAUDE_PLUGIN_DATA}/backups/` — previous versions of metamorph-edited files (one-level rollback)
 
 ## Build (dev only)
 
@@ -77,7 +77,7 @@ npm run build   # outputs to dist/
 
 ## Configuration
 
-Edit `metamorph/config.jsonc` directly or use `/metamorph-config set key=value`. Comments are allowed in the config file.
+Edit `${CLAUDE_PLUGIN_DATA}/config.jsonc` directly or use `/metamorph-config set key=value`. Comments are allowed in the config file.
 
 ## Security
 

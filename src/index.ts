@@ -1,11 +1,15 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import { ensurePersistentData, resolveDataRoot } from "./runtime.js";
 
 const PLUGIN_ROOT = process.env.CLAUDE_PLUGIN_ROOT ?? path.dirname(__dirname);
 const CLAUDE_ROOT = path.join(os.homedir(), ".claude");
-const DATA_DIR = path.join(PLUGIN_ROOT, "data");
+const DATA_ROOT = resolveDataRoot(PLUGIN_ROOT);
+const DATA_DIR = path.join(DATA_ROOT, "data");
 const ERROR_LOG = path.join(DATA_DIR, "hook-errors.log");
+
+ensurePersistentData(PLUGIN_ROOT, DATA_ROOT);
 
 function logError(context: string, err: unknown): void {
   try {
@@ -19,17 +23,17 @@ function logError(context: string, err: unknown): void {
 
 async function runSessionStart(): Promise<void> {
   const { sessionStart } = await import("./hooks/sessionStart");
-  await sessionStart(PLUGIN_ROOT, CLAUDE_ROOT);
+  await sessionStart(DATA_ROOT, CLAUDE_ROOT);
 }
 
 async function runSessionEnd(): Promise<void> {
   const { sessionEnd } = await import("./hooks/sessionEnd");
-  await sessionEnd(PLUGIN_ROOT, CLAUDE_ROOT);
+  await sessionEnd(DATA_ROOT, CLAUDE_ROOT);
 }
 
 async function runConfigSet(key: string, value: string): Promise<void> {
   const { setConfigValue } = await import("./config");
-  setConfigValue(PLUGIN_ROOT, key, value);
+  setConfigValue(DATA_ROOT, key, value);
   console.log(`Set ${key} = ${value}`);
 }
 
@@ -37,61 +41,61 @@ async function runConfigWrite(json: string): Promise<void> {
   const { writeConfig, mergeWithDefaults } = await import("./config");
   // Validate through mergeWithDefaults to enforce all bounds and types (H-3)
   const validated = mergeWithDefaults(JSON.parse(json));
-  writeConfig(PLUGIN_ROOT, validated);
+  writeConfig(DATA_ROOT, validated);
   console.log("Config saved.");
 }
 
 async function runFeedbackAdd(text: string): Promise<void> {
   const { addFeedback } = await import("./feedback");
-  addFeedback(PLUGIN_ROOT, text);
+  addFeedback(DATA_ROOT, text);
   console.log("Feedback logged.");
 }
 
 async function runFeedbackList(): Promise<void> {
   const { listFeedback } = await import("./feedback");
-  console.log(listFeedback(PLUGIN_ROOT));
+  console.log(listFeedback(DATA_ROOT));
 }
 
 async function runFeedbackClear(): Promise<void> {
   const { clearFeedback } = await import("./feedback");
-  clearFeedback(PLUGIN_ROOT);
+  clearFeedback(DATA_ROOT);
   console.log("Feedback log cleared.");
 }
 
 async function runPrepareImprove(targetId: string): Promise<void> {
   const { prepareImprove } = await import("./improve/improver");
-  await prepareImprove(PLUGIN_ROOT, CLAUDE_ROOT, targetId);
+  await prepareImprove(DATA_ROOT, CLAUDE_ROOT, targetId);
 }
 
 async function runImproveApprove(id: string): Promise<void> {
   const { approveImprovement } = await import("./improve/improver");
-  await approveImprovement(PLUGIN_ROOT, CLAUDE_ROOT, id);
+  await approveImprovement(DATA_ROOT, CLAUDE_ROOT, id);
 }
 
 async function runImproveReject(id: string): Promise<void> {
   const { rejectImprovement } = await import("./improve/improver");
-  await rejectImprovement(PLUGIN_ROOT, id);
+  await rejectImprovement(DATA_ROOT, id);
 }
 
 async function runImproveList(): Promise<void> {
   const { listImprovements } = await import("./improve/improver");
-  console.log(listImprovements(PLUGIN_ROOT));
+  console.log(listImprovements(DATA_ROOT));
 }
 
 async function runRollbackList(): Promise<void> {
   const { rollbackList } = await import("./rollback/rollback");
-  console.log(rollbackList(PLUGIN_ROOT));
+  console.log(rollbackList(DATA_ROOT));
 }
 
 async function runRollbackFile(filePath: string): Promise<void> {
   const { rollbackFile } = await import("./rollback/rollback");
-  const result = await rollbackFile(PLUGIN_ROOT, filePath);
+  const result = await rollbackFile(DATA_ROOT, filePath);
   console.log(result.ok ? `Restored: ${filePath}` : `Error: ${result.error}`);
 }
 
 async function runRollbackRun(runId: string): Promise<void> {
   const { rollbackRun } = await import("./rollback/rollback");
-  console.log(await rollbackRun(PLUGIN_ROOT, runId));
+  console.log(await rollbackRun(DATA_ROOT, runId));
 }
 
 async function main(): Promise<void> {

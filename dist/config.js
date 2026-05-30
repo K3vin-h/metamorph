@@ -149,6 +149,7 @@ function loadConfig(pluginRoot) {
 function writeConfig(pluginRoot, config) {
     const configPath = path.join(pluginRoot, "config.jsonc");
     const json = JSON.stringify(config, null, 2);
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
     fs.writeFileSync(configPath, json, "utf8");
 }
 const SAFE_KEY_RE = /^[a-zA-Z][a-zA-Z0-9_]*$/;

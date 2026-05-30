@@ -19,7 +19,7 @@ Log feedback that shapes future improvement suggestions.
 
 ## How feedback is used
 
-Feedback entries are appended to `metamorph/data/feedback.log`. The analyzer reads this file and includes entries in `analysis.json`. The improvement step treats logged feedback as additional signal when prioritizing and wording suggestions. The dashboard renders feedback in its own section.
+Feedback entries are appended to `${CLAUDE_PLUGIN_DATA}/data/feedback.log`. The analyzer reads this file and includes entries in `analysis.json`. The improvement step treats logged feedback as additional signal when prioritizing and wording suggestions. The dashboard renders feedback in its own section.
 
 ---
 

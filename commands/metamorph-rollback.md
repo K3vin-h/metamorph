@@ -17,7 +17,7 @@ Restore a previous version of a metamorph-edited file.
 
 ## How rollback works
 
-Before metamorph writes any approved edit, it saves the current file content to `metamorph/backups/`. Only the **single most recent** pre-edit version is kept per file. If a later run re-edited the same file, the earlier backup is gone (by design — one-level undo).
+Before metamorph writes any approved edit, it saves the current file content to `${CLAUDE_PLUGIN_DATA}/backups/`. Only the **single most recent** pre-edit version is kept per file. If a later run re-edited the same file, the earlier backup is gone (by design — one-level undo).
 
 `/metamorph-rollback --run <runId>` reports which files in that run are still restorable vs. superseded by a later edit.
 

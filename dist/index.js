@@ -36,10 +36,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const os = __importStar(require("os"));
+const runtime_js_1 = require("./runtime.js");
 const PLUGIN_ROOT = process.env.CLAUDE_PLUGIN_ROOT ?? path.dirname(__dirname);
 const CLAUDE_ROOT = path.join(os.homedir(), ".claude");
-const DATA_DIR = path.join(PLUGIN_ROOT, "data");
+const DATA_ROOT = (0, runtime_js_1.resolveDataRoot)(PLUGIN_ROOT);
+const DATA_DIR = path.join(DATA_ROOT, "data");
 const ERROR_LOG = path.join(DATA_DIR, "hook-errors.log");
+(0, runtime_js_1.ensurePersistentData)(PLUGIN_ROOT, DATA_ROOT);
 function logError(context, err) {
     try {
         fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -52,66 +55,66 @@ function logError(context, err) {
 }
 async function runSessionStart() {
     const { sessionStart } = await Promise.resolve().then(() => __importStar(require("./hooks/sessionStart")));
-    await sessionStart(PLUGIN_ROOT, CLAUDE_ROOT);
+    await sessionStart(DATA_ROOT, CLAUDE_ROOT);
 }
 async function runSessionEnd() {
     const { sessionEnd } = await Promise.resolve().then(() => __importStar(require("./hooks/sessionEnd")));
-    await sessionEnd(PLUGIN_ROOT, CLAUDE_ROOT);
+    await sessionEnd(DATA_ROOT, CLAUDE_ROOT);
 }
 async function runConfigSet(key, value) {
     const { setConfigValue } = await Promise.resolve().then(() => __importStar(require("./config")));
-    setConfigValue(PLUGIN_ROOT, key, value);
+    setConfigValue(DATA_ROOT, key, value);
     console.log(`Set ${key} = ${value}`);
 }
 async function runConfigWrite(json) {
     const { writeConfig, mergeWithDefaults } = await Promise.resolve().then(() => __importStar(require("./config")));
     // Validate through mergeWithDefaults to enforce all bounds and types (H-3)
     const validated = mergeWithDefaults(JSON.parse(json));
-    writeConfig(PLUGIN_ROOT, validated);
+    writeConfig(DATA_ROOT, validated);
     console.log("Config saved.");
 }
 async function runFeedbackAdd(text) {
     const { addFeedback } = await Promise.resolve().then(() => __importStar(require("./feedback")));
-    addFeedback(PLUGIN_ROOT, text);
+    addFeedback(DATA_ROOT, text);
     console.log("Feedback logged.");
 }
 async function runFeedbackList() {
     const { listFeedback } = await Promise.resolve().then(() => __importStar(require("./feedback")));
-    console.log(listFeedback(PLUGIN_ROOT));
+    console.log(listFeedback(DATA_ROOT));
 }
 async function runFeedbackClear() {
     const { clearFeedback } = await Promise.resolve().then(() => __importStar(require("./feedback")));
-    clearFeedback(PLUGIN_ROOT);
+    clearFeedback(DATA_ROOT);
     console.log("Feedback log cleared.");
 }
 async function runPrepareImprove(targetId) {
     const { prepareImprove } = await Promise.resolve().then(() => __importStar(require("./improve/improver")));
-    await prepareImprove(PLUGIN_ROOT, CLAUDE_ROOT, targetId);
+    await prepareImprove(DATA_ROOT, CLAUDE_ROOT, targetId);
 }
 async function runImproveApprove(id) {
     const { approveImprovement } = await Promise.resolve().then(() => __importStar(require("./improve/improver")));
-    await approveImprovement(PLUGIN_ROOT, CLAUDE_ROOT, id);
+    await approveImprovement(DATA_ROOT, CLAUDE_ROOT, id);
 }
 async function runImproveReject(id) {
     const { rejectImprovement } = await Promise.resolve().then(() => __importStar(require("./improve/improver")));
-    await rejectImprovement(PLUGIN_ROOT, id);
+    await rejectImprovement(DATA_ROOT, id);
 }
 async function runImproveList() {
     const { listImprovements } = await Promise.resolve().then(() => __importStar(require("./improve/improver")));
-    console.log(listImprovements(PLUGIN_ROOT));
+    console.log(listImprovements(DATA_ROOT));
 }
 async function runRollbackList() {
     const { rollbackList } = await Promise.resolve().then(() => __importStar(require("./rollback/rollback")));
-    console.log(rollbackList(PLUGIN_ROOT));
+    console.log(rollbackList(DATA_ROOT));
 }
 async function runRollbackFile(filePath) {
     const { rollbackFile } = await Promise.resolve().then(() => __importStar(require("./rollback/rollback")));
-    const result = await rollbackFile(PLUGIN_ROOT, filePath);
+    const result = await rollbackFile(DATA_ROOT, filePath);
     console.log(result.ok ? `Restored: ${filePath}` : `Error: ${result.error}`);
 }
 async function runRollbackRun(runId) {
     const { rollbackRun } = await Promise.resolve().then(() => __importStar(require("./rollback/rollback")));
-    console.log(await rollbackRun(PLUGIN_ROOT, runId));
+    console.log(await rollbackRun(DATA_ROOT, runId));
 }
 async function main() {
     const [, , command, ...args] = process.argv;

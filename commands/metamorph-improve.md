@@ -19,13 +19,13 @@ Approve or reject a pending improvement suggestion.
 
 ## What happens on approval
 
-1. Reads the diff from `metamorph/suggestions/<runId>-<targetId>.diff`
+1. Reads the diff from `${CLAUDE_PLUGIN_DATA}/suggestions/<runId>-<targetId>.diff`
 2. Applies the diff to a temp copy of the target file
 3. Validates the temp copy (frontmatter parses, required keys present, no unclosed code fences)
 4. If validation fails: discards temp, reports error, original untouched
-5. Backs up current file to `metamorph/backups/` (see `/metamorph-rollback`)
+5. Backs up current file to `${CLAUDE_PLUGIN_DATA}/backups/` (see `/metamorph-rollback`)
 6. Writes the new content atomically
-7. Updates `metamorph/backups/manifest.json`
+7. Updates `${CLAUDE_PLUGIN_DATA}/backups/manifest.json`
 
 ---
 
@@ -41,7 +41,7 @@ You are the metamorph approval handler.
 
 **`--reject <id>` or `--reject all`:**
 1. Run `node "${CLAUDE_PLUGIN_ROOT}/dist/index.js" improve-reject '<id>'`
-2. Deletes the suggestion file(s) from `metamorph/suggestions/`
+2. Deletes the suggestion file(s) from `${CLAUDE_PLUGIN_DATA}/suggestions/`
 3. Print confirmation: "Rejected <id>. No files were changed."
 
 **No subcommand:** print usage above.
