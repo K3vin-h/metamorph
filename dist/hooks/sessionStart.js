@@ -37,20 +37,35 @@ exports.sessionStart = sessionStart;
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const config_js_1 = require("../config.js");
+function isAnalysisResult(value) {
+    if (typeof value !== "object" || value === null)
+        return false;
+    const v = value;
+    return (typeof v.sessionCount === "number" &&
+        Array.isArray(v.agents) &&
+        Array.isArray(v.skills) &&
+        typeof v.totals === "object" &&
+        v.totals !== null);
+}
 async function sessionStart(pluginRoot, _claudeRoot) {
     const analysisPath = path.join(pluginRoot, "data", "analysis.json");
     if (!fs.existsSync(analysisPath)) {
         console.log("metamorph: no data yet — run a session to begin tracking.");
         return;
     }
-    let analysis;
+    let parsed;
     try {
-        analysis = JSON.parse(fs.readFileSync(analysisPath, "utf8"));
+        parsed = JSON.parse(fs.readFileSync(analysisPath, "utf8"));
     }
     catch {
         console.log("metamorph: could not read analysis data.");
         return;
     }
+    if (!isAnalysisResult(parsed)) {
+        console.log("metamorph: analysis data is invalid or from an older version — run a session to refresh.");
+        return;
+    }
+    const analysis = parsed;
     const config = (0, config_js_1.loadConfig)(pluginRoot);
     const { sessionCount, totals, agents, skills } = analysis;
     const warmupMet = sessionCount >= config.warmupSessions;

@@ -6,6 +6,7 @@ import { sha256, confinePath } from "../security.js";
 import { checkWritePermission } from "../permissions.js";
 import { readManifest } from "./writer.js";
 import { loadConfig } from "../config.js";
+import { isNodeError } from "../hookErrors.js";
 
 function validateBackupContent(content: string): boolean {
   const fenceMatches = content.match(/^```/gm) ?? [];
@@ -19,9 +20,16 @@ export function rollbackList(pluginRoot: string): string {
 
   const lines = ["Restorable backups:", ""];
   for (const [relPath, entry] of entries) {
+    if (!entry.backupPath) {
+      lines.push(`  ${relPath} [NEW FILE — no prior version to restore] · Run: ${entry.runId}`);
+      continue;
+    }
+
+    const confinedOriginal = confinePath(entry.originalPath, [path.join(os.homedir(), ".claude")]);
     let currentChecksum = "";
     try {
-      const currentContent = fs.readFileSync(entry.originalPath, "utf8");
+      if (!confinedOriginal) throw new Error("outside roots");
+      const currentContent = fs.readFileSync(confinedOriginal, "utf8");
       currentChecksum = sha256(currentContent);
     } catch {
       lines.push(`  ${relPath} [ORIGINAL NOT FOUND] — Run ID: ${entry.runId} @ ${entry.timestamp}`);
@@ -45,7 +53,6 @@ export async function rollbackFile(pluginRoot: string, filePath: string): Promis
   const manifest = readManifest(pluginRoot);
   const config = loadConfig(pluginRoot);
 
-  // Find entry by original path or relative path
   let relPath = filePath;
   let entry = manifest.entries[relPath];
 
@@ -63,7 +70,10 @@ export async function rollbackFile(pluginRoot: string, filePath: string): Promis
     return { ok: false, error: `No backup found for: ${filePath}` };
   }
 
-  // Confine the original path — never write outside allowed roots (guards against tampered manifest)
+  if (!entry.backupPath) {
+    return { ok: false, error: `No backup for ${relPath} — metamorph created this file; delete it manually if needed.` };
+  }
+
   const confinedTarget = confinePath(entry.originalPath, [claudeRoot]);
   if (!confinedTarget) {
     return { ok: false, error: `Restore rejected: target path is outside allowed roots: ${entry.originalPath}` };
@@ -73,7 +83,6 @@ export async function rollbackFile(pluginRoot: string, filePath: string): Promis
     return { ok: false, error: `Restore rejected: write permission denied (${perm.reason}) for ${relPath}` };
   }
 
-  // Confine the backup path — never read from outside pluginRoot
   const confinedBackup = confinePath(entry.backupPath, [pluginRoot]);
   if (!confinedBackup) {
     return { ok: false, error: `Restore rejected: backup path is outside plugin root: ${entry.backupPath}` };
@@ -89,7 +98,6 @@ export async function rollbackFile(pluginRoot: string, filePath: string): Promis
     return { ok: false, error: `Backup file appears corrupted. Cannot restore safely.` };
   }
 
-  // Check if current file was manually edited
   try {
     const currentContent = fs.readFileSync(confinedTarget, "utf8");
     const currentChecksum = sha256(currentContent);
@@ -99,11 +107,12 @@ export async function rollbackFile(pluginRoot: string, filePath: string): Promis
         `Restoring backup will overwrite your manual changes.`
       );
     }
-  } catch {
-    // File doesn't exist — restore without warning
+  } catch (err) {
+    if (!isNodeError(err, "ENOENT")) {
+      return { ok: false, error: `Cannot read current file before restore: ${err instanceof Error ? err.message : err}` };
+    }
   }
 
-  // Atomic restore: write to tmp then rename
   const tmpPath = confinedTarget + ".metamorph-restore-tmp";
   try {
     fs.writeFileSync(tmpPath, backupContent, "utf8");
@@ -113,7 +122,6 @@ export async function rollbackFile(pluginRoot: string, filePath: string): Promis
     return { ok: false, error: `Failed to restore: ${err}` };
   }
 
-  // Remove manifest entry
   delete manifest.entries[relPath];
   const manifestPath = path.join(pluginRoot, "backups", "manifest.json");
   fs.mkdirSync(path.dirname(manifestPath), { recursive: true });
@@ -135,7 +143,8 @@ export async function rollbackRun(pluginRoot: string, runId: string): Promise<st
   }
 
   for (const [relPath, entry] of runEntries) {
-    if (!fs.existsSync(entry.backupPath)) {
+    const confinedBackup = entry.backupPath ? confinePath(entry.backupPath, [pluginRoot]) : null;
+    if (!confinedBackup || !fs.existsSync(confinedBackup)) {
       lines.push(`  SKIP ${relPath} — backup not found (may have been superseded)`);
       continue;
     }

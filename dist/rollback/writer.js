@@ -40,6 +40,8 @@ const path = __importStar(require("path"));
 const os = __importStar(require("os"));
 const security_js_1 = require("../security.js");
 const permissions_js_1 = require("../permissions.js");
+const utils_js_1 = require("../utils.js");
+const hookErrors_js_1 = require("../hookErrors.js");
 const manifestPath = (pluginRoot) => path.join(pluginRoot, "backups", "manifest.json");
 function readManifest(pluginRoot) {
     try {
@@ -56,28 +58,14 @@ function writeManifest(pluginRoot, manifest) {
     fs.writeFileSync(tmp, JSON.stringify(manifest, null, 2), "utf8");
     fs.renameSync(tmp, p);
 }
-function parseFrontmatter(content) {
-    const match = content.match(/^---\s*\n([\s\S]*?)\n---/);
-    if (!match)
-        return {};
-    const result = {};
-    for (const line of match[1].split("\n")) {
-        const sep = line.indexOf(":");
-        if (sep >= 0)
-            result[line.slice(0, sep).trim()] = line.slice(sep + 1).trim();
-    }
-    return result;
-}
 function validateContent(content) {
-    // Frontmatter must be parseable and contain required keys
     const hasFrontmatter = /^---\s*\n[\s\S]*?\n---/.test(content);
     if (hasFrontmatter) {
-        const fm = parseFrontmatter(content);
+        const fm = (0, utils_js_1.parseFrontmatter)(content);
         if (!fm.name || !fm.description) {
             return { ok: false, error: "Frontmatter missing required keys: name, description" };
         }
     }
-    // Check for unclosed code fences
     const fenceMatches = content.match(/^```/gm) ?? [];
     if (fenceMatches.length % 2 !== 0) {
         return { ok: false, error: "Unclosed code fence detected in proposed content" };
@@ -87,22 +75,18 @@ function validateContent(content) {
 async function writeWithBackup(targetPath, proposedContent, runId, config, pluginRoot) {
     const claudeRoot = path.join(os.homedir(), ".claude");
     const allowedRoots = [claudeRoot];
-    // 1. Path confinement
     const confined = (0, security_js_1.confinePath)(targetPath, allowedRoots);
     if (!confined) {
         return { ok: false, error: `Path rejected: ${targetPath} is outside allowed roots or uses path traversal` };
     }
-    // 2. Write permission check
     const perm = (0, permissions_js_1.checkWritePermission)(confined, config, claudeRoot);
     if (!perm.allowed) {
         return { ok: false, error: `Write permission denied: ${perm.reason} for ${confined}` };
     }
-    // 3. Validate content before touching the filesystem
     const validation = validateContent(proposedContent);
     if (!validation.ok) {
         return { ok: false, error: `Validation failed: ${validation.error}` };
     }
-    // 4. Write to temp file
     const tmpPath = confined + ".metamorph-tmp";
     try {
         fs.writeFileSync(tmpPath, proposedContent, "utf8");
@@ -110,7 +94,6 @@ async function writeWithBackup(targetPath, proposedContent, runId, config, plugi
     catch (err) {
         return { ok: false, error: `Failed to write temp file: ${err}` };
     }
-    // 5. Manual-edit guard
     const manifest = readManifest(pluginRoot);
     const relPath = path.relative(claudeRoot, confined);
     const existingEntry = manifest.entries[relPath];
@@ -126,14 +109,13 @@ async function writeWithBackup(targetPath, proposedContent, runId, config, plugi
         if (currentChecksum !== existingEntry.writtenChecksum) {
             console.warn(`[metamorph] Warning: ${relPath} was manually edited since metamorph's last write. ` +
                 `Treating your version as the new backup point.`);
-            // Proceed — treat current file as the backup source
         }
     }
-    // 6. Backup current content
+    let backupPath = null;
     if (currentContent) {
         const backupDir = path.join(pluginRoot, "backups", path.dirname(relPath));
         fs.mkdirSync(backupDir, { recursive: true });
-        const backupPath = path.join(pluginRoot, "backups", relPath + ".metamorph-bak");
+        backupPath = path.join(pluginRoot, "backups", relPath + ".metamorph-bak");
         const backupTmp = backupPath + ".tmp";
         try {
             fs.writeFileSync(backupTmp, currentContent, "utf8");
@@ -146,18 +128,14 @@ async function writeWithBackup(targetPath, proposedContent, runId, config, plugi
             catch { /* ignore */ }
             return { ok: false, error: `Failed to write backup: ${err}` };
         }
-        // 7. Update manifest
-        const entry = {
-            originalPath: confined,
-            backupPath,
-            runId,
-            timestamp: new Date().toISOString(),
-            writtenChecksum: (0, security_js_1.sha256)(proposedContent),
-        };
-        manifest.entries[relPath] = entry;
-        writeManifest(pluginRoot, manifest);
     }
-    // 8. Atomic write
+    const entry = {
+        originalPath: confined,
+        backupPath,
+        runId,
+        timestamp: new Date().toISOString(),
+        writtenChecksum: (0, security_js_1.sha256)(proposedContent),
+    };
     try {
         fs.renameSync(tmpPath, confined);
     }
@@ -167,6 +145,17 @@ async function writeWithBackup(targetPath, proposedContent, runId, config, plugi
         }
         catch { /* ignore */ }
         return { ok: false, error: `Failed to write file: ${err}` };
+    }
+    manifest.entries[relPath] = entry;
+    try {
+        writeManifest(pluginRoot, manifest);
+    }
+    catch (err) {
+        (0, hookErrors_js_1.logHookError)(pluginRoot, "write-manifest", err);
+        return {
+            ok: true,
+            message: `Written: ${relPath} (warning: manifest update failed — rollback list may be incomplete)`,
+        };
     }
     return { ok: true, message: `Written: ${relPath}` };
 }

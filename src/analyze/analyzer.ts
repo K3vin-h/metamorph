@@ -7,6 +7,8 @@ import { loadConfig } from "../config.js";
 import { readFeedbackEntries } from "../feedback.js";
 import { scoreTarget } from "../score/scorer.js";
 import { getCount } from "../capture/sessionCounter.js";
+import { parseFrontmatter } from "../utils.js";
+import { logHookError } from "../hookErrors.js";
 
 interface DefinitionFile {
   id: string;
@@ -17,18 +19,6 @@ interface DefinitionFile {
   rawContent: string;
 }
 
-function parseFrontmatter(content: string): Record<string, string> {
-  const match = content.match(/^---\s*\n([\s\S]*?)\n---/);
-  if (!match) return {};
-  const result: Record<string, string> = {};
-  for (const line of match[1].split("\n")) {
-    const sep = line.indexOf(":");
-    if (sep < 0) continue;
-    result[line.slice(0, sep).trim()] = line.slice(sep + 1).trim();
-  }
-  return result;
-}
-
 function extractSections(content: string): string[] {
   return content
     .split("\n")
@@ -37,7 +27,6 @@ function extractSections(content: string): string[] {
 }
 
 function extractDeclaredTools(content: string): string[] {
-  // Look for YAML frontmatter tools key or common tool list patterns
   const fm = parseFrontmatter(content);
   if (fm.tools) {
     return fm.tools
@@ -47,13 +36,11 @@ function extractDeclaredTools(content: string): string[] {
       .filter(Boolean);
   }
 
-  // Try to find tool list in body
   const toolMatch = content.match(/\*\*Tools[:\s]+\*\*(.*?)(?:\n|$)/);
   if (toolMatch) {
     return toolMatch[1].split(/[,;]/).map((t) => t.trim()).filter(Boolean);
   }
 
-  // Look for "(Tools: X, Y, Z)" pattern common in agent files
   const parenMatch = content.match(/\(Tools?:\s*([^)]+)\)/i);
   if (parenMatch) {
     return parenMatch[1].split(",").map((t) => t.trim()).filter(Boolean);
@@ -62,7 +49,11 @@ function extractDeclaredTools(content: string): string[] {
   return [];
 }
 
-function loadDefinitionFiles(claudeRoot: string, category: "agents" | "skills"): DefinitionFile[] {
+function loadDefinitionFiles(
+  claudeRoot: string,
+  category: "agents" | "skills",
+  pluginRoot: string
+): DefinitionFile[] {
   const defs: DefinitionFile[] = [];
   const baseDir = path.join(claudeRoot, category === "agents" ? "agents" : "skills");
 
@@ -84,8 +75,8 @@ function loadDefinitionFiles(claudeRoot: string, category: "agents" | "skills"):
           sections: extractSections(content),
           rawContent: content,
         });
-      } catch {
-        // skip unreadable
+      } catch (err) {
+        logHookError(pluginRoot, `load-agent-def:${file}`, err);
       }
     }
   } else {
@@ -105,8 +96,8 @@ function loadDefinitionFiles(claudeRoot: string, category: "agents" | "skills"):
           sections: extractSections(content),
           rawContent: content,
         });
-      } catch {
-        // skip
+      } catch (err) {
+        logHookError(pluginRoot, `load-skill-def:${skillDir.name}`, err);
       }
     }
   }
@@ -123,6 +114,7 @@ function aggregateProfiles(sessions: Record<string, SessionProfile>): {
   totalToolCalls: number;
   totalAgentRuns: number;
   totalSkillLoads: number;
+  skippedTranscriptLines: number;
 } {
   const agentInvocations: Record<string, number> = {};
   const agentUsedTools: Record<string, Set<string>> = {};
@@ -132,16 +124,17 @@ function aggregateProfiles(sessions: Record<string, SessionProfile>): {
   let totalToolCalls = 0;
   let totalAgentRuns = 0;
   let totalSkillLoads = 0;
+  let skippedTranscriptLines = 0;
 
   for (const session of Object.values(sessions)) {
+    if (!session?.toolCalls) continue;
+
     totalToolCalls += session.toolCalls.length;
+    skippedTranscriptLines += session.skippedLines ?? 0;
 
     for (const [agentId, count] of Object.entries(session.agentInvocations)) {
       agentInvocations[agentId] = (agentInvocations[agentId] ?? 0) + count;
       totalAgentRuns += count;
-      if (!agentUsedTools[agentId]) agentUsedTools[agentId] = new Set();
-      // Tools used by this agent — we get this from tool calls attributed to agent context
-      // For now populate from general tool calls
     }
 
     for (const ev of session.toolCalls) {
@@ -165,7 +158,17 @@ function aggregateProfiles(sessions: Record<string, SessionProfile>): {
     }
   }
 
-  return { agentInvocations, agentUsedTools, skillLoads, skillApplied, fileExtensions, totalToolCalls, totalAgentRuns, totalSkillLoads };
+  return {
+    agentInvocations,
+    agentUsedTools,
+    skillLoads,
+    skillApplied,
+    fileExtensions,
+    totalToolCalls,
+    totalAgentRuns,
+    totalSkillLoads,
+    skippedTranscriptLines,
+  };
 }
 
 function computeLanguages(fileExtensions: Record<string, number>): Record<string, number> {
@@ -181,13 +184,12 @@ function computeLanguages(fileExtensions: Record<string, number>): Record<string
 export async function runAnalysis(pluginRoot: string, claudeRoot: string): Promise<AnalysisResult> {
   const config = loadConfig(pluginRoot);
   const cache = readProfileCache(pluginRoot);
-  const history = parseHistory(claudeRoot, config.read.denyGlobs);
+  const history = await parseHistory(claudeRoot, config.read.denyGlobs);
   const feedback = readFeedbackEntries(pluginRoot);
   const sessionCount = getCount(pluginRoot);
 
   const agg = aggregateProfiles(cache.sessions);
 
-  // Merge history data
   for (const [k, v] of Object.entries(history.skillLoads)) {
     agg.skillLoads[k] = (agg.skillLoads[k] ?? 0) + v;
   }
@@ -203,12 +205,12 @@ export async function runAnalysis(pluginRoot: string, claudeRoot: string): Promi
     toolCalls: agg.totalToolCalls,
     agentRuns: agg.totalAgentRuns,
     skillLoads: agg.totalSkillLoads,
+    ...(agg.skippedTranscriptLines > 0 ? { skippedTranscriptLines: agg.skippedTranscriptLines } : {}),
   };
 
   const languages = computeLanguages(agg.fileExtensions);
 
-  // Score agents
-  const agentDefs = loadDefinitionFiles(claudeRoot, "agents");
+  const agentDefs = loadDefinitionFiles(claudeRoot, "agents", pluginRoot);
   const agents = agentDefs.map((def) => {
     const invocations = agg.agentInvocations[def.id] ?? 0;
     const usedTools = [...(agg.agentUsedTools[def.id] ?? new Set())];
@@ -220,8 +222,7 @@ export async function runAnalysis(pluginRoot: string, claudeRoot: string): Promi
     );
   });
 
-  // Score skills
-  const skillDefs = loadDefinitionFiles(claudeRoot, "skills");
+  const skillDefs = loadDefinitionFiles(claudeRoot, "skills", pluginRoot);
   const skills = skillDefs.map((def) => {
     const loads = agg.skillLoads[def.id] ?? 0;
     const applied = agg.skillApplied[def.id] ?? 0;
@@ -244,7 +245,6 @@ export async function runAnalysis(pluginRoot: string, claudeRoot: string): Promi
     feedback,
   };
 
-  // Write atomically
   const analysisPath = path.join(pluginRoot, "data", "analysis.json");
   fs.mkdirSync(path.dirname(analysisPath), { recursive: true });
   const tmp = analysisPath + ".tmp";

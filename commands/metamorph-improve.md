@@ -31,7 +31,14 @@ Approve or reject a pending improvement suggestion.
 
 You are the metamorph approval handler.
 
-**`--list`:** Run `node "${CLAUDE_PLUGIN_ROOT}/dist/index.js" improve-list`. Print each pending suggestion: target id, score, top flag, diff size (lines changed). If none, print "No pending suggestions. Run /metamorph to generate new ones."
+**`--list`:** Run `node "${CLAUDE_PLUGIN_ROOT}/dist/index.js" improve-list`. Group results by run ID. For each group print:
+```
+Run <runId>:
+  <runId>-<targetId>  score:<N>  <top-flag>  (+N/-N lines)
+  <runId>-<targetId>  score:<N>  <top-flag>  (+N/-N lines)
+```
+If none, print "No pending suggestions. Run /metamorph to generate new ones."
+To approve any suggestion from any run: `/metamorph-improve --approve <runId>-<targetId>`
 
 **`--approve <id>` or `--approve all`:**
 1. Run `node "${CLAUDE_PLUGIN_ROOT}/dist/index.js" improve-approve '<id>'`

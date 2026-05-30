@@ -53,6 +53,27 @@ function copyPathIfMissing(src, dest) {
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     fs.copyFileSync(src, dest);
 }
+function isMetamorphPluginDir(dir) {
+    try {
+        const manifestPath = path.join(dir, ".claude-plugin", "plugin.json");
+        if (fs.existsSync(manifestPath)) {
+            const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+            if (manifest.name === "metamorph")
+                return true;
+        }
+        const pkgPath = path.join(dir, "package.json");
+        if (fs.existsSync(pkgPath)) {
+            const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+            if (pkg.name === "metamorph")
+                return true;
+        }
+        return (fs.existsSync(path.join(dir, "dist", "index.js")) &&
+            fs.existsSync(path.join(dir, "hooks", "hooks.json")));
+    }
+    catch {
+        return false;
+    }
+}
 function runtimeCandidates(pluginRoot) {
     const candidates = [];
     const parent = path.dirname(pluginRoot);
@@ -62,7 +83,7 @@ function runtimeCandidates(pluginRoot) {
             .filter((entry) => entry.isDirectory())
             .map((entry) => path.join(parent, entry.name))
             .filter((dir) => dir !== pluginRoot)
-            .filter((dir) => fs.existsSync(path.join(dir, "data")) || fs.existsSync(path.join(dir, "config.jsonc")))
+            .filter(isMetamorphPluginDir)
             .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
         candidates.push(...siblings);
     }

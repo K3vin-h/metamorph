@@ -2,6 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 import type { StyleProfile, AnalysisResult } from "./types.js";
 import { loadConfig } from "./config.js";
+import { logHookError } from "./hookErrors.js";
 
 const styleProfilePath = (pluginRoot: string) =>
   path.join(pluginRoot, "data", "style-profile.json");
@@ -56,9 +57,12 @@ function mergeFrontmatterKeyOrders(orders: string[][]): string[] {
   }
   const keys = Object.keys(freq);
   keys.sort((a, b) => {
-    const aPos = Object.entries(freq[a]).reduce((best, [pos, cnt]) => cnt > (freq[a][parseInt(best)] ?? 0) ? pos : best, "0");
-    const bPos = Object.entries(freq[b]).reduce((best, [pos, cnt]) => cnt > (freq[b][parseInt(best)] ?? 0) ? pos : best, "0");
-    return parseInt(aPos) - parseInt(bPos);
+    const bestPos = (key: string) =>
+      Object.entries(freq[key]).reduce(
+        (best, [pos, cnt]) => (cnt > (freq[key][Number(best)] ?? 0) ? pos : best),
+        "0"
+      );
+    return Number(bestPos(a)) - Number(bestPos(b));
   });
   return keys;
 }
@@ -94,18 +98,20 @@ export async function deriveStyleProfile(
   let hasNumberedLists = false;
   const toneKeywords = new Set<string>();
   const wordCounts: number[] = [];
+  let filesRead = 0;
 
   for (const filePath of filesToScan) {
     try {
       const content = fs.readFileSync(filePath, "utf8");
+      filesRead++;
       bulletCounts[detectBulletStyle(content)]++;
       headingCounts[detectHeadingStyle(content)]++;
       frontmatterOrders.push(extractFrontmatterKeys(content));
       if (/^\d+\. /m.test(content)) hasNumberedLists = true;
       for (const kw of extractToneKeywords(content)) toneKeywords.add(kw);
       wordCounts.push(avgSectionWordCount(content));
-    } catch {
-      // skip
+    } catch (err) {
+      logHookError(pluginRoot, `style-scan:${filePath}`, err);
     }
   }
 
@@ -116,11 +122,19 @@ export async function deriveStyleProfile(
     numberedLists: hasNumberedLists,
     toneKeywords: [...toneKeywords],
     avgSectionLength: wordCounts.length > 0 ? Math.round(wordCounts.reduce((s, n) => s + n, 0) / wordCounts.length) : 0,
+    derivedFromFiles: filesRead,
   };
 
   const p = styleProfilePath(pluginRoot);
   fs.mkdirSync(path.dirname(p), { recursive: true });
-  fs.writeFileSync(p, JSON.stringify(profile, null, 2), "utf8");
+  const tmp = p + ".tmp";
+  try {
+    fs.writeFileSync(tmp, JSON.stringify(profile, null, 2), "utf8");
+    fs.renameSync(tmp, p);
+  } catch (err) {
+    logHookError(pluginRoot, "write-style-profile", err);
+    throw err;
+  }
 
   return profile;
 }

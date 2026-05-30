@@ -182,9 +182,21 @@ export function generateReportHtml(pluginRoot: string, analysis: AnalysisResult)
     ${feedback.length > 0 ? `<ul style="margin-bottom:12px">${feedback.map((f) => `<li style="font-size:13px;margin:4px 0">${escapeHtml(f)}</li>`).join("")}</ul>` : "<p style=\"font-size:13px;color:#888;margin-bottom:12px\">No feedback logged yet.</p>"}
     <div class="feedback-input">
       <input type="text" id="feedback-text" placeholder="Type feedback..." maxlength="500">
-      <button onclick="(function(){const t=document.getElementById('feedback-text').value.trim();if(!t)return;const cmd='/metamorph-feedback \\"'+t.replace(/\\\\/g,'\\\\\\\\').replace(/\\"/g,'\\\\\\"')+'\\"';const el=document.getElementById('feedback-cmd');el.textContent=cmd;el.style.display='block'})()">Generate command</button>
+      <button type="button" data-feedback-gen="1" style="margin-left:8px;padding:2px 10px;font-size:12px;cursor:pointer;border:1px solid #ccc;border-radius:4px;background:#f5f5f5">Generate command</button>
     </div>
-    <div id="feedback-cmd"></div>
+    <div id="feedback-cmd" style="display:none;margin-top:8px;font-family:monospace;font-size:12px;background:#f0f0f0;padding:8px;border-radius:4px"></div>
+    <script>
+    document.querySelector('[data-feedback-gen]')?.addEventListener('click', function() {
+      var input = document.getElementById('feedback-text');
+      var out = document.getElementById('feedback-cmd');
+      if (!input || !out) return;
+      var t = String(input.value || '').trim().replace(/[\\r\\n\\x00]/g, ' ').slice(0, 500);
+      if (!t) return;
+      var safe = t.replace(/\\\\/g, '\\\\\\\\').replace(/"/g, '\\\\"');
+      out.textContent = '/metamorph-feedback "' + safe + '"';
+      out.style.display = 'block';
+    });
+    </script>
     <div style="font-size:11px;color:#aaa;margin-top:4px">Paste the generated command into Claude Code to log your feedback.</div>
   </div>
 

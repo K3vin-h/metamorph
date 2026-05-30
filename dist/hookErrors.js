@@ -33,44 +33,27 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.increment = increment;
-exports.getCount = getCount;
+exports.logHookError = logHookError;
+exports.isNodeError = isNodeError;
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
-const counterPath = (pluginRoot) => path.join(pluginRoot, "data", "session-counter.json");
-function read(pluginRoot) {
-    const p = counterPath(pluginRoot);
+function logHookError(pluginRoot, context, err) {
+    const msg = `[${new Date().toISOString()}] ${context}: ${err instanceof Error ? err.message : String(err)}\n`;
     try {
-        return JSON.parse(fs.readFileSync(p, "utf8"));
+        const logPath = path.join(pluginRoot, "data", "hook-errors.log");
+        fs.mkdirSync(path.dirname(logPath), { recursive: true });
+        fs.appendFileSync(logPath, msg, "utf8");
     }
     catch {
-        return { count: 0, seenIds: [] };
-    }
-}
-function write(pluginRoot, counter) {
-    const p = counterPath(pluginRoot);
-    fs.mkdirSync(path.dirname(p), { recursive: true });
-    const tmp = p + ".tmp";
-    fs.writeFileSync(tmp, JSON.stringify(counter, null, 2), "utf8");
-    fs.renameSync(tmp, p);
-}
-const MAX_SEEN_IDS = 2000;
-// Idempotent: returns current count (increments only if sessionId not already seen)
-function increment(pluginRoot, sessionId) {
-    const counter = read(pluginRoot);
-    const seenSet = new Set(counter.seenIds);
-    if (!seenSet.has(sessionId)) {
-        seenSet.add(sessionId);
-        counter.seenIds = [...seenSet];
-        if (counter.seenIds.length > MAX_SEEN_IDS) {
-            counter.seenIds = counter.seenIds.slice(-MAX_SEEN_IDS);
+        try {
+            process.stderr.write(`[metamorph] ${msg}`);
         }
-        counter.count++;
-        write(pluginRoot, counter);
+        catch {
+            // Last resort — hooks must never throw
+        }
     }
-    return counter.count;
 }
-function getCount(pluginRoot) {
-    return read(pluginRoot).count;
+function isNodeError(err, code) {
+    return typeof err === "object" && err !== null && "code" in err && err.code === code;
 }
-//# sourceMappingURL=sessionCounter.js.map
+//# sourceMappingURL=hookErrors.js.map

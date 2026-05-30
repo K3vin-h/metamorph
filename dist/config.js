@@ -40,6 +40,7 @@ exports.setConfigValue = setConfigValue;
 exports.mergeWithDefaults = mergeWithDefaults;
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
+const hookErrors_js_1 = require("./hookErrors.js");
 const DEFAULTS = {
     mode: "suggest",
     warmupSessions: 5,
@@ -51,7 +52,7 @@ const DEFAULTS = {
         denyGlobs: ["projects/**/secrets*", "**/*.env*", "**/.env", "**/credentials*"],
     },
     write: {
-        targets: { agents: true, skills: true, claudeMd: false },
+        targets: { agents: true, skills: true, claudeMd: "both" },
         allow: ["agents/*", "skills/*/SKILL.md"],
         deny: [],
     },
@@ -100,6 +101,15 @@ function stripJsoncComments(text) {
 function isValidPrivacyMode(v) {
     return v === "full" || v === "redacted" || v === "off";
 }
+function parseClaudeMdScope(v) {
+    if (v === "global" || v === "local" || v === "both")
+        return v;
+    if (v === false || v === null || v === undefined)
+        return false;
+    if (v === true)
+        return "both"; // backward-compat
+    return DEFAULTS.write.targets.claudeMd;
+}
 function mergeWithDefaults(raw) {
     if (typeof raw !== "object" || raw === null)
         return { ...DEFAULTS };
@@ -122,7 +132,7 @@ function mergeWithDefaults(raw) {
             targets: {
                 agents: typeof targets.agents === "boolean" ? targets.agents : DEFAULTS.write.targets.agents,
                 skills: typeof targets.skills === "boolean" ? targets.skills : DEFAULTS.write.targets.skills,
-                claudeMd: typeof targets.claudeMd === "boolean" ? targets.claudeMd : DEFAULTS.write.targets.claudeMd,
+                claudeMd: parseClaudeMdScope(targets.claudeMd),
             },
             allow: Array.isArray(write.allow) ? write.allow.filter((g) => typeof g === "string") : DEFAULTS.write.allow,
             deny: Array.isArray(write.deny) ? write.deny.filter((g) => typeof g === "string") : DEFAULTS.write.deny,
@@ -142,7 +152,11 @@ function loadConfig(pluginRoot) {
         const parsed = JSON.parse(stripped);
         return mergeWithDefaults(parsed);
     }
-    catch {
+    catch (err) {
+        if ((0, hookErrors_js_1.isNodeError)(err, "ENOENT")) {
+            return { ...DEFAULTS };
+        }
+        (0, hookErrors_js_1.logHookError)(pluginRoot, "load-config", err);
         return { ...DEFAULTS };
     }
 }

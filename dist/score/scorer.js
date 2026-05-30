@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.scoreTarget = scoreTarget;
+const security_js_1 = require("../security.js");
 // Keywords that suggest a section's content is being exercised
 const SECTION_KEYWORDS = {
     "security": ["security", "auth", "secret", "permission"],
@@ -9,11 +10,10 @@ const SECTION_KEYWORDS = {
     "rollback": ["rollback", "restore", "undo", "revert"],
     "setup": ["setup", "install", "configure", "init"],
 };
-function computeSectionScore(sections, rawContent, usedTools, readMode) {
+function computeSectionScore(sections, _rawContent, usedTools) {
     if (sections.length === 0)
         return { score: 100, deadSections: [] };
     const deadSections = [];
-    const contentLower = rawContent.toLowerCase();
     const usedToolsLower = usedTools.map((t) => t.toLowerCase());
     let hitCount = 0;
     for (const section of sections) {
@@ -49,7 +49,7 @@ function scoreTarget(data, totals, config, kind) {
         ? 100
         : (usedTools.length / declaredTools.length) * 100;
     // Section coverage score (20%)
-    const { score: sectionScore, deadSections } = computeSectionScore(sections, rawContent, usedTools, readMode);
+    const { score: sectionScore, deadSections } = computeSectionScore(sections, rawContent, usedTools);
     // Skill apply score (10%) — only meaningful for skills
     const skillApplyScore = kind === "skill" ? (loads === 0 ? 100 : (applied / loads) * 100) : 100;
     const combined = Math.round(invocationScore * 0.4 +
@@ -89,8 +89,9 @@ function scoreTarget(data, totals, config, kind) {
     for (const flag of flags) {
         if (flag.section) {
             const sectionContent = extractSectionContent(rawContent, flag.section);
-            if (sectionContent)
-                flaggedSectionText[flag.section] = sectionContent;
+            if (sectionContent) {
+                flaggedSectionText[flag.section] = (0, security_js_1.scrubSecrets)(sectionContent);
+            }
         }
     }
     return {

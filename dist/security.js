@@ -61,8 +61,8 @@ function buildSecretPatterns() {
         /\/\/registry\.npmjs\.org\/:_authToken=\S+/g,
         // PEM private key blocks
         /-----BEGIN [A-Z ]+ PRIVATE KEY-----[\s\S]*?-----END [A-Z ]+ PRIVATE KEY-----/g,
-        // Generic long hex strings (32+ chars)
-        /\b[0-9a-f]{32,}\b/gi,
+        // Git commit SHAs (40 hex chars) — avoid scrubbing shorter hex strings
+        /\b[0-9a-f]{40}\b/gi,
     ];
 }
 function scrubSecrets(text) {
@@ -123,9 +123,10 @@ function wrapUntrusted(data) {
 }
 const DIRECTIVE_PATTERNS = [
     // Common prompt injection patterns
-    /ignore (previous|all|your) instructions?/gi,
-    /disregard (previous|all|your) instructions?/gi,
+    /ignore (previous|all|your|above) instructions?/gi,
+    /disregard (previous|all|your|above) instructions?/gi,
     /forget (previous|all|your) instructions?/gi,
+    /override (previous|all|your) instructions?/gi,
     /new instructions?:/gi,
     /system prompt:/gi,
     /you are now/gi,

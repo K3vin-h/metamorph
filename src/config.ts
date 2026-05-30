@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import type { Config, PrivacyMode } from "./types.js";
+import { logHookError, isNodeError } from "./hookErrors.js";
 
 const DEFAULTS: Config = {
   mode: "suggest",
@@ -13,7 +14,7 @@ const DEFAULTS: Config = {
     denyGlobs: ["projects/**/secrets*", "**/*.env*", "**/.env", "**/credentials*"],
   },
   write: {
-    targets: { agents: true, skills: true, claudeMd: false },
+    targets: { agents: true, skills: true, claudeMd: "both" as const },
     allow: ["agents/*", "skills/*/SKILL.md"],
     deny: [],
   },
@@ -67,6 +68,13 @@ function isValidPrivacyMode(v: unknown): v is PrivacyMode {
   return v === "full" || v === "redacted" || v === "off";
 }
 
+function parseClaudeMdScope(v: unknown): "global" | "local" | "both" | false {
+  if (v === "global" || v === "local" || v === "both") return v;
+  if (v === false || v === null || v === undefined) return false;
+  if (v === true) return "both"; // backward-compat
+  return DEFAULTS.write.targets.claudeMd;
+}
+
 function mergeWithDefaults(raw: unknown): Config {
   if (typeof raw !== "object" || raw === null) return { ...DEFAULTS };
 
@@ -90,7 +98,7 @@ function mergeWithDefaults(raw: unknown): Config {
       targets: {
         agents: typeof targets.agents === "boolean" ? targets.agents : DEFAULTS.write.targets.agents,
         skills: typeof targets.skills === "boolean" ? targets.skills : DEFAULTS.write.targets.skills,
-        claudeMd: typeof targets.claudeMd === "boolean" ? targets.claudeMd : DEFAULTS.write.targets.claudeMd,
+        claudeMd: parseClaudeMdScope(targets.claudeMd),
       },
       allow: Array.isArray(write.allow) ? write.allow.filter((g): g is string => typeof g === "string") : DEFAULTS.write.allow,
       deny: Array.isArray(write.deny) ? write.deny.filter((g): g is string => typeof g === "string") : DEFAULTS.write.deny,
@@ -110,7 +118,11 @@ export function loadConfig(pluginRoot: string): Config {
     const stripped = stripJsoncComments(raw);
     const parsed = JSON.parse(stripped);
     return mergeWithDefaults(parsed);
-  } catch {
+  } catch (err) {
+    if (isNodeError(err, "ENOENT")) {
+      return { ...DEFAULTS };
+    }
+    logHookError(pluginRoot, "load-config", err);
     return { ...DEFAULTS };
   }
 }

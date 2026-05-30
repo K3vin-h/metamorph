@@ -35,47 +35,68 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.parseHistory = parseHistory;
 const fs = __importStar(require("fs"));
+const readline = __importStar(require("readline"));
 const path = __importStar(require("path"));
 const permissions_js_1 = require("../permissions.js");
-function parseHistory(claudeRoot, denyGlobs) {
+const hookErrors_js_1 = require("../hookErrors.js");
+const MAX_HISTORY_LINES = 10000;
+async function parseHistoryJsonl(historyPath, summary) {
+    const stream = fs.createReadStream(historyPath, "utf8");
+    const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
+    const tail = [];
+    for await (const line of rl) {
+        if (!line.trim())
+            continue;
+        tail.push(line);
+        if (tail.length > MAX_HISTORY_LINES)
+            tail.shift();
+    }
+    for (const entryLine of tail) {
+        try {
+            const entry = JSON.parse(entryLine);
+            if (entry.skillId) {
+                summary.skillLoads[entry.skillId] = (summary.skillLoads[entry.skillId] ?? 0) + 1;
+                if (entry.type === "apply") {
+                    summary.skillApplied[entry.skillId] = (summary.skillApplied[entry.skillId] ?? 0) + 1;
+                }
+            }
+        }
+        catch {
+            // skip malformed lines
+        }
+    }
+}
+async function parseHistory(claudeRoot, denyGlobs) {
     const summary = {
         skillLoads: {},
         skillApplied: {},
         fileExtensions: {},
     };
-    // Parse history.jsonl
     const historyPath = path.join(claudeRoot, "history.jsonl");
     if (fs.existsSync(historyPath)) {
-        const lines = fs.readFileSync(historyPath, "utf8").split("\n");
-        for (const line of lines) {
-            if (!line.trim())
-                continue;
-            try {
-                const entry = JSON.parse(line);
-                if (entry.skillId) {
-                    summary.skillLoads[entry.skillId] = (summary.skillLoads[entry.skillId] ?? 0) + 1;
-                    if (entry.type === "apply") {
-                        summary.skillApplied[entry.skillId] = (summary.skillApplied[entry.skillId] ?? 0) + 1;
-                    }
-                }
-            }
-            catch {
-                // skip malformed lines
-            }
+        try {
+            await parseHistoryJsonl(historyPath, summary);
+        }
+        catch (err) {
+            (0, hookErrors_js_1.logHookError)(claudeRoot, "parse-history-jsonl", err);
         }
     }
-    // Parse file-history/ for language distribution
     const fileHistoryDir = path.join(claudeRoot, "file-history");
     if (fs.existsSync(fileHistoryDir)) {
-        const entries = fs.readdirSync(fileHistoryDir);
-        for (const entry of entries) {
-            const fullPath = path.join(fileHistoryDir, entry);
-            if (!(0, permissions_js_1.checkReadPermission)(fullPath, denyGlobs, claudeRoot))
-                continue;
-            const ext = path.extname(entry).toLowerCase();
-            if (ext) {
-                summary.fileExtensions[ext] = (summary.fileExtensions[ext] ?? 0) + 1;
+        try {
+            const entries = fs.readdirSync(fileHistoryDir);
+            for (const entry of entries) {
+                const fullPath = path.join(fileHistoryDir, entry);
+                if (!(0, permissions_js_1.checkReadPermission)(fullPath, denyGlobs, claudeRoot))
+                    continue;
+                const ext = path.extname(entry).toLowerCase();
+                if (ext) {
+                    summary.fileExtensions[ext] = (summary.fileExtensions[ext] ?? 0) + 1;
+                }
             }
+        }
+        catch (err) {
+            (0, hookErrors_js_1.logHookError)(claudeRoot, "parse-file-history", err);
         }
     }
     return summary;

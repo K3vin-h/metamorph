@@ -3,6 +3,18 @@ import * as path from "path";
 import type { AnalysisResult } from "../types.js";
 import { loadConfig } from "../config.js";
 
+function isAnalysisResult(value: unknown): value is AnalysisResult {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as AnalysisResult;
+  return (
+    typeof v.sessionCount === "number" &&
+    Array.isArray(v.agents) &&
+    Array.isArray(v.skills) &&
+    typeof v.totals === "object" &&
+    v.totals !== null
+  );
+}
+
 export async function sessionStart(pluginRoot: string, _claudeRoot: string): Promise<void> {
   const analysisPath = path.join(pluginRoot, "data", "analysis.json");
 
@@ -11,14 +23,20 @@ export async function sessionStart(pluginRoot: string, _claudeRoot: string): Pro
     return;
   }
 
-  let analysis: AnalysisResult;
+  let parsed: unknown;
   try {
-    analysis = JSON.parse(fs.readFileSync(analysisPath, "utf8"));
+    parsed = JSON.parse(fs.readFileSync(analysisPath, "utf8"));
   } catch {
     console.log("metamorph: could not read analysis data.");
     return;
   }
 
+  if (!isAnalysisResult(parsed)) {
+    console.log("metamorph: analysis data is invalid or from an older version — run a session to refresh.");
+    return;
+  }
+
+  const analysis = parsed;
   const config = loadConfig(pluginRoot);
   const { sessionCount, totals, agents, skills } = analysis;
   const warmupMet = sessionCount >= config.warmupSessions;

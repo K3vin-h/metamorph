@@ -6,6 +6,8 @@ import { loadConfig } from "../config.js";
 import { loadStyleProfile } from "../style.js";
 import { stripDirectives, wrapUntrusted, scrubSecrets, confinePath } from "../security.js";
 import { writeWithBackup } from "../rollback/writer.js";
+import { assertSafeId } from "../utils.js";
+import { logHookError } from "../hookErrors.js";
 
 const suggestionsDir = (pluginRoot: string) => path.join(pluginRoot, "suggestions");
 const dataDir = (pluginRoot: string) => path.join(pluginRoot, "data");
@@ -23,13 +25,20 @@ function makeRunId(): string {
 }
 
 function readTargetFile(filePath: string, flaggedSections: string[]): string {
-  const content = fs.readFileSync(filePath, "utf8");
+  let content: string;
+  try {
+    content = fs.readFileSync(filePath, "utf8");
+  } catch (err) {
+    throw new Error(
+      `Target file not found or unreadable: ${filePath} — it may have been deleted since the last analysis. (${err instanceof Error ? err.message : err})`
+    );
+  }
+
   const lines = content.split("\n");
 
   if (lines.length <= 400) return content;
 
-  // For large files, extract only flagged sections with 10 lines surrounding context
-  if (flaggedSections.length === 0) return content.slice(0, 400 * 80); // rough char limit
+  if (flaggedSections.length === 0) return content.slice(0, 400 * 80);
 
   const result: string[] = ["[... file truncated — showing flagged sections only ...]", ""];
   const addedRanges: Array<[number, number]> = [];
@@ -55,17 +64,29 @@ function readTargetFile(filePath: string, flaggedSections: string[]): string {
   return result.join("\n");
 }
 
+function parseRunIdFromDiff(diffContent: string, suggestionId: string): string {
+  const runMatch = diffContent.match(/^#\s*run-id:\s*(.+)$/m);
+  if (runMatch) return runMatch[1].trim();
+  return suggestionId.split("-").slice(0, 3).join("-");
+}
+
 // Prepare the compact context file for the subagent to read
 export async function prepareImprove(
   pluginRoot: string,
   claudeRoot: string,
   targetId: string
 ): Promise<void> {
+  assertSafeId(targetId, "target id");
+
   const analysis = loadAnalysis(pluginRoot);
   if (!analysis) throw new Error("No analysis.json found. Run a session first.");
 
   const config = loadConfig(pluginRoot);
   const style = loadStyleProfile(pluginRoot);
+  if (!style) {
+    logHookError(pluginRoot, "prepare-improve", "style-profile.json missing — using generic style defaults");
+  }
+
   const runId = makeRunId();
 
   const target: AgentProfile | undefined =
@@ -74,13 +95,16 @@ export async function prepareImprove(
   if (!target) throw new Error(`Target not found: ${targetId}`);
 
   const targetFilePath = path.join(claudeRoot, target.path);
-  const flaggedSections = Object.keys(target.flaggedSectionText ?? {});
-  const rawFileContent = readTargetFile(targetFilePath, flaggedSections);
+  const confinedTarget = confinePath(targetFilePath, [claudeRoot]);
+  if (!confinedTarget) {
+    throw new Error(`Target path is outside allowed roots: ${target.path}`);
+  }
 
-  // Sanitize full file content before it reaches the LLM context (C-1, H-1)
+  const flaggedSections = Object.keys(target.flaggedSectionText ?? {});
+  const rawFileContent = readTargetFile(confinedTarget, flaggedSections);
+
   const safeFileContent = wrapUntrusted(stripDirectives(scrubSecrets(rawFileContent)));
 
-  // Strip directives and wrap flagged section text
   const processedSections: Record<string, string> = {};
   for (const [heading, text] of Object.entries(target.flaggedSectionText ?? {})) {
     processedSections[heading] = wrapUntrusted(stripDirectives(scrubSecrets(text)));
@@ -124,25 +148,27 @@ export async function approveImprovement(
   claudeRoot: string,
   id: string
 ): Promise<void> {
+  assertSafeId(id, "suggestion id");
+
   const diffPath = path.join(suggestionsDir(pluginRoot), `${id}.diff`);
   if (!fs.existsSync(diffPath)) {
     throw new Error(`Suggestion not found: ${diffPath}`);
   }
 
-  // Read the diff and the target path from the suggestion file
-  // The diff file contains a header comment with the target path
   const diffContent = fs.readFileSync(diffPath, "utf8");
   const targetMatch = diffContent.match(/^#\s*target:\s*(.+)$/m);
   const proposedMatch = diffContent.match(/^#\s*proposed-content-path:\s*(.+)$/m);
 
+  if (!targetMatch) {
+    throw new Error("Suggestion file missing # target: header");
+  }
   if (!proposedMatch) {
     throw new Error("Suggestion file missing proposed content path");
   }
 
   const proposedPath = proposedMatch[1].trim();
-  const targetPath = targetMatch ? path.join(claudeRoot, targetMatch[1].trim()) : "";
+  const targetPath = path.join(claudeRoot, targetMatch[1].trim());
 
-  // Confine proposed-content-path to pluginRoot before reading (C-2)
   const confinedProposed = confinePath(proposedPath, [pluginRoot]);
   if (!confinedProposed) {
     throw new Error(`Proposed content path is outside plugin root: ${proposedPath}`);
@@ -154,10 +180,9 @@ export async function approveImprovement(
 
   const proposedContent = fs.readFileSync(confinedProposed, "utf8");
   const config = loadConfig(pluginRoot);
-  // runId is "run-{timestamp}-{hex}" — take the first 3 segments (fix incorrect split)
-  const runId = id.split("-").slice(0, 3).join("-");
+  const runId = parseRunIdFromDiff(diffContent, id);
 
-  const result = await writeWithBackup(targetPath, proposedContent, runId ?? id, config, pluginRoot);
+  const result = await writeWithBackup(targetPath, proposedContent, runId, config, pluginRoot);
 
   if (!result.ok) {
     throw new Error(result.error);
@@ -165,35 +190,44 @@ export async function approveImprovement(
 
   console.log(result.message ?? "Done.");
 
-  // Clean up suggestion and context files
-  try { fs.unlinkSync(diffPath); } catch { /* non-critical */ }
-  try { fs.unlinkSync(confinedProposed); } catch { /* non-critical */ }
-  // Clean up the context file for this run+target if it exists
-  const contextGlob = path.join(dataDir(pluginRoot), `improve-context-${runId}-`);
+  const cleanup = (filePath: string, label: string) => {
+    try {
+      fs.unlinkSync(filePath);
+    } catch (err) {
+      logHookError(pluginRoot, `approve-cleanup-${label}`, err);
+    }
+  };
+
+  cleanup(diffPath, "diff");
+  cleanup(confinedProposed, "proposed");
+
   try {
     for (const f of fs.readdirSync(dataDir(pluginRoot))) {
       if (f.startsWith(`improve-context-${runId}-`)) {
-        fs.unlinkSync(path.join(dataDir(pluginRoot), f));
+        cleanup(path.join(dataDir(pluginRoot), f), "context");
       }
     }
-  } catch { /* non-critical */ }
+  } catch (err) {
+    logHookError(pluginRoot, "approve-cleanup-context-dir", err);
+  }
 }
 
 export async function rejectImprovement(pluginRoot: string, id: string): Promise<void> {
-  // Validate id is a safe file stem (H-4)
-  if (!/^[\w\-]+$/.test(id)) {
-    throw new Error(`Invalid suggestion id: ${id}`);
-  }
+  assertSafeId(id, "suggestion id");
+
   const dir = suggestionsDir(pluginRoot);
   if (!fs.existsSync(dir)) {
     console.log(`No pending suggestions.`);
     return;
   }
-  for (const file of fs.readdirSync(dir)) {
-    if (file.startsWith(id)) {
-      fs.unlinkSync(path.join(dir, file));
-    }
+
+  const diffName = `${id}.diff`;
+  const diffPath = path.join(dir, diffName);
+  if (!fs.existsSync(diffPath)) {
+    throw new Error(`Suggestion not found: ${id}`);
   }
+
+  fs.unlinkSync(diffPath);
   console.log(`Rejected: ${id}. No files changed.`);
 }
 
@@ -206,13 +240,13 @@ export function listImprovements(pluginRoot: string): string {
 
   const lines = ["Pending suggestions:", ""];
   for (const diff of diffs) {
-    const id = diff.replace(".diff", "");
+    const suggestionId = diff.replace(/\.diff$/, "");
     const diffPath = path.join(dir, diff);
     const stat = fs.statSync(diffPath);
-    lines.push(`  ${id}`);
+    lines.push(`  ${suggestionId}`);
     lines.push(`    Created: ${stat.mtime.toLocaleString()}`);
-    lines.push(`    Approve: /metamorph-improve --approve ${id}`);
-    lines.push(`    Reject:  /metamorph-improve --reject  ${id}`);
+    lines.push(`    Approve: /metamorph-improve --approve ${suggestionId}`);
+    lines.push(`    Reject:  /metamorph-improve --reject  ${suggestionId}`);
     lines.push("");
   }
 

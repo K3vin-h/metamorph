@@ -1,21 +1,27 @@
 import * as path from "path";
 import type { Config, PermissionResult } from "./types.js";
 
-function matchGlob(pattern: string, filePath: string): boolean {
-  // Simple glob matching: supports * (any segment chars) and ** (any path segments)
+function globToRegex(pattern: string): string {
   const escapeRegex = (s: string) => s.replace(/[.+^${}()|[\]\\]/g, "\\$&");
+  let regex = "";
+  for (let i = 0; i < pattern.length; ) {
+    if (pattern.slice(i, i + 2) === "**") {
+      regex += "(?:[^/]+/)*";
+      i += 2;
+    } else if (pattern[i] === "*") {
+      regex += "[^/]*";
+      i += 1;
+    } else {
+      regex += escapeRegex(pattern[i]);
+      i += 1;
+    }
+  }
+  return `^${regex}$`;
+}
 
-  const regexStr = pattern
-    .split("**")
-    .map((part) =>
-      part
-        .split("*")
-        .map(escapeRegex)
-        .join("[^/]*")
-    )
-    .join(".*");
-
-  const regex = new RegExp(`^${regexStr}$`);
+function matchGlob(pattern: string, filePath: string): boolean {
+  if (filePath.includes("..") || path.isAbsolute(filePath)) return false;
+  const regex = new RegExp(globToRegex(pattern));
   return regex.test(filePath);
 }
 
@@ -32,18 +38,15 @@ export function checkWritePermission(
   config: Config,
   claudeRoot: string
 ): PermissionResult {
-  // 1. Path safety: must not contain traversal (already resolved, but double-check)
   if (resolvedPath.includes("..")) {
     return { allowed: false, reason: "path-traversal" };
   }
 
-  // 2. Must be inside claudeRoot
   const rel = path.relative(claudeRoot, resolvedPath);
   if (rel.startsWith("..")) {
     return { allowed: false, reason: "outside-root" };
   }
 
-  // 3. Category toggle check
   const category = getCategory(resolvedPath, claudeRoot);
   if (category !== null) {
     if (!config.write.targets[category]) {
@@ -51,14 +54,12 @@ export function checkWritePermission(
     }
   }
 
-  // 4. Deny glob list — any match wins
   for (const denyGlob of config.write.deny) {
     if (matchGlob(denyGlob, rel)) {
       return { allowed: false, reason: "deny-glob" };
     }
   }
 
-  // 5. Allow glob list — must match at least one
   if (config.write.allow.length > 0) {
     const allowed = config.write.allow.some((allowGlob) => matchGlob(allowGlob, rel));
     if (!allowed) {
@@ -75,6 +76,7 @@ export function checkReadPermission(
   claudeRoot: string
 ): boolean {
   const rel = path.relative(claudeRoot, filePath);
+  if (rel.startsWith("..")) return false;
   return !denyGlobs.some((glob) => matchGlob(glob, rel));
 }
 

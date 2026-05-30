@@ -33,87 +33,84 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const os = __importStar(require("os"));
 const runtime_js_1 = require("./runtime.js");
+const hookErrors_js_1 = require("./hookErrors.js");
 const PLUGIN_ROOT = process.env.CLAUDE_PLUGIN_ROOT ?? path.dirname(__dirname);
 const CLAUDE_ROOT = path.join(os.homedir(), ".claude");
 const DATA_ROOT = (0, runtime_js_1.resolveDataRoot)(PLUGIN_ROOT);
-const DATA_DIR = path.join(DATA_ROOT, "data");
-const ERROR_LOG = path.join(DATA_DIR, "hook-errors.log");
 (0, runtime_js_1.ensurePersistentData)(PLUGIN_ROOT, DATA_ROOT);
 function logError(context, err) {
-    try {
-        fs.mkdirSync(DATA_DIR, { recursive: true });
-        const msg = `[${new Date().toISOString()}] ${context}: ${err instanceof Error ? err.message : String(err)}\n`;
-        fs.appendFileSync(ERROR_LOG, msg, "utf8");
-    }
-    catch {
-        // Cannot log — fail silently so hooks never block sessions
-    }
+    (0, hookErrors_js_1.logHookError)(DATA_ROOT, context, err);
 }
 async function runSessionStart() {
-    const { sessionStart } = await Promise.resolve().then(() => __importStar(require("./hooks/sessionStart")));
+    const { sessionStart } = await Promise.resolve().then(() => __importStar(require("./hooks/sessionStart.js")));
     await sessionStart(DATA_ROOT, CLAUDE_ROOT);
 }
 async function runSessionEnd() {
-    const { sessionEnd } = await Promise.resolve().then(() => __importStar(require("./hooks/sessionEnd")));
+    const { sessionEnd } = await Promise.resolve().then(() => __importStar(require("./hooks/sessionEnd.js")));
     await sessionEnd(DATA_ROOT, CLAUDE_ROOT);
 }
 async function runConfigSet(key, value) {
-    const { setConfigValue } = await Promise.resolve().then(() => __importStar(require("./config")));
+    const { setConfigValue } = await Promise.resolve().then(() => __importStar(require("./config.js")));
     setConfigValue(DATA_ROOT, key, value);
     console.log(`Set ${key} = ${value}`);
 }
 async function runConfigWrite(json) {
-    const { writeConfig, mergeWithDefaults } = await Promise.resolve().then(() => __importStar(require("./config")));
-    // Validate through mergeWithDefaults to enforce all bounds and types (H-3)
-    const validated = mergeWithDefaults(JSON.parse(json));
+    const { writeConfig, mergeWithDefaults } = await Promise.resolve().then(() => __importStar(require("./config.js")));
+    let parsed;
+    try {
+        parsed = JSON.parse(json);
+    }
+    catch {
+        throw new Error(`Invalid JSON for config-write: ${json.slice(0, 80)}`);
+    }
+    const validated = mergeWithDefaults(parsed);
     writeConfig(DATA_ROOT, validated);
     console.log("Config saved.");
 }
 async function runFeedbackAdd(text) {
-    const { addFeedback } = await Promise.resolve().then(() => __importStar(require("./feedback")));
+    const { addFeedback } = await Promise.resolve().then(() => __importStar(require("./feedback.js")));
     addFeedback(DATA_ROOT, text);
     console.log("Feedback logged.");
 }
 async function runFeedbackList() {
-    const { listFeedback } = await Promise.resolve().then(() => __importStar(require("./feedback")));
+    const { listFeedback } = await Promise.resolve().then(() => __importStar(require("./feedback.js")));
     console.log(listFeedback(DATA_ROOT));
 }
 async function runFeedbackClear() {
-    const { clearFeedback } = await Promise.resolve().then(() => __importStar(require("./feedback")));
+    const { clearFeedback } = await Promise.resolve().then(() => __importStar(require("./feedback.js")));
     clearFeedback(DATA_ROOT);
     console.log("Feedback log cleared.");
 }
 async function runPrepareImprove(targetId) {
-    const { prepareImprove } = await Promise.resolve().then(() => __importStar(require("./improve/improver")));
+    const { prepareImprove } = await Promise.resolve().then(() => __importStar(require("./improve/improver.js")));
     await prepareImprove(DATA_ROOT, CLAUDE_ROOT, targetId);
 }
 async function runImproveApprove(id) {
-    const { approveImprovement } = await Promise.resolve().then(() => __importStar(require("./improve/improver")));
+    const { approveImprovement } = await Promise.resolve().then(() => __importStar(require("./improve/improver.js")));
     await approveImprovement(DATA_ROOT, CLAUDE_ROOT, id);
 }
 async function runImproveReject(id) {
-    const { rejectImprovement } = await Promise.resolve().then(() => __importStar(require("./improve/improver")));
+    const { rejectImprovement } = await Promise.resolve().then(() => __importStar(require("./improve/improver.js")));
     await rejectImprovement(DATA_ROOT, id);
 }
 async function runImproveList() {
-    const { listImprovements } = await Promise.resolve().then(() => __importStar(require("./improve/improver")));
+    const { listImprovements } = await Promise.resolve().then(() => __importStar(require("./improve/improver.js")));
     console.log(listImprovements(DATA_ROOT));
 }
 async function runRollbackList() {
-    const { rollbackList } = await Promise.resolve().then(() => __importStar(require("./rollback/rollback")));
+    const { rollbackList } = await Promise.resolve().then(() => __importStar(require("./rollback/rollback.js")));
     console.log(rollbackList(DATA_ROOT));
 }
 async function runRollbackFile(filePath) {
-    const { rollbackFile } = await Promise.resolve().then(() => __importStar(require("./rollback/rollback")));
+    const { rollbackFile } = await Promise.resolve().then(() => __importStar(require("./rollback/rollback.js")));
     const result = await rollbackFile(DATA_ROOT, filePath);
     console.log(result.ok ? `Restored: ${filePath}` : `Error: ${result.error}`);
 }
 async function runRollbackRun(runId) {
-    const { rollbackRun } = await Promise.resolve().then(() => __importStar(require("./rollback/rollback")));
+    const { rollbackRun } = await Promise.resolve().then(() => __importStar(require("./rollback/rollback.js")));
     console.log(await rollbackRun(DATA_ROOT, runId));
 }
 async function main() {
@@ -169,7 +166,6 @@ async function main() {
     }
     catch (err) {
         logError(command ?? "unknown", err);
-        // Hook commands must never crash the session
         if (command === "session-start" || command === "session-end") {
             process.exit(0);
         }
@@ -180,7 +176,7 @@ main().catch((err) => {
     logError("main", err);
     const [, , cmd] = process.argv;
     if (cmd === "session-start" || cmd === "session-end") {
-        process.exit(0); // Hooks must never block the session
+        process.exit(0);
     }
     process.exit(1);
 });

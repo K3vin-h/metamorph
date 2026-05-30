@@ -43,7 +43,7 @@ export async function parseTranscript(
       for (const block of raw.content) {
         if (block.type === "tool_use" && block.name === "Agent" && block.id) {
           const agentType = (block.input as Record<string, unknown>)?.subagent_type;
-          if (typeof agentType === "string" && block.id) {
+          if (typeof agentType === "string") {
             profile.agentCallMappings[block.id] = agentType;
           }
         }

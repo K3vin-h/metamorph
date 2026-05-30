@@ -42,19 +42,8 @@ const config_js_1 = require("../config.js");
 const feedback_js_1 = require("../feedback.js");
 const scorer_js_1 = require("../score/scorer.js");
 const sessionCounter_js_1 = require("../capture/sessionCounter.js");
-function parseFrontmatter(content) {
-    const match = content.match(/^---\s*\n([\s\S]*?)\n---/);
-    if (!match)
-        return {};
-    const result = {};
-    for (const line of match[1].split("\n")) {
-        const sep = line.indexOf(":");
-        if (sep < 0)
-            continue;
-        result[line.slice(0, sep).trim()] = line.slice(sep + 1).trim();
-    }
-    return result;
-}
+const utils_js_1 = require("../utils.js");
+const hookErrors_js_1 = require("../hookErrors.js");
 function extractSections(content) {
     return content
         .split("\n")
@@ -62,8 +51,7 @@ function extractSections(content) {
         .map((l) => l.trim());
 }
 function extractDeclaredTools(content) {
-    // Look for YAML frontmatter tools key or common tool list patterns
-    const fm = parseFrontmatter(content);
+    const fm = (0, utils_js_1.parseFrontmatter)(content);
     if (fm.tools) {
         return fm.tools
             .replace(/[\[\]]/g, "")
@@ -71,19 +59,17 @@ function extractDeclaredTools(content) {
             .map((t) => t.trim())
             .filter(Boolean);
     }
-    // Try to find tool list in body
     const toolMatch = content.match(/\*\*Tools[:\s]+\*\*(.*?)(?:\n|$)/);
     if (toolMatch) {
         return toolMatch[1].split(/[,;]/).map((t) => t.trim()).filter(Boolean);
     }
-    // Look for "(Tools: X, Y, Z)" pattern common in agent files
     const parenMatch = content.match(/\(Tools?:\s*([^)]+)\)/i);
     if (parenMatch) {
         return parenMatch[1].split(",").map((t) => t.trim()).filter(Boolean);
     }
     return [];
 }
-function loadDefinitionFiles(claudeRoot, category) {
+function loadDefinitionFiles(claudeRoot, category, pluginRoot) {
     const defs = [];
     const baseDir = path.join(claudeRoot, category === "agents" ? "agents" : "skills");
     if (!fs.existsSync(baseDir))
@@ -95,7 +81,7 @@ function loadDefinitionFiles(claudeRoot, category) {
             const filePath = path.join(baseDir, file);
             try {
                 const content = fs.readFileSync(filePath, "utf8");
-                const fm = parseFrontmatter(content);
+                const fm = (0, utils_js_1.parseFrontmatter)(content);
                 const id = fm.name ?? file.replace(".md", "");
                 defs.push({
                     id,
@@ -106,8 +92,8 @@ function loadDefinitionFiles(claudeRoot, category) {
                     rawContent: content,
                 });
             }
-            catch {
-                // skip unreadable
+            catch (err) {
+                (0, hookErrors_js_1.logHookError)(pluginRoot, `load-agent-def:${file}`, err);
             }
         }
     }
@@ -120,7 +106,7 @@ function loadDefinitionFiles(claudeRoot, category) {
                 continue;
             try {
                 const content = fs.readFileSync(skillMd, "utf8");
-                const fm = parseFrontmatter(content);
+                const fm = (0, utils_js_1.parseFrontmatter)(content);
                 const id = fm.name ?? skillDir.name;
                 defs.push({
                     id,
@@ -131,8 +117,8 @@ function loadDefinitionFiles(claudeRoot, category) {
                     rawContent: content,
                 });
             }
-            catch {
-                // skip
+            catch (err) {
+                (0, hookErrors_js_1.logHookError)(pluginRoot, `load-skill-def:${skillDir.name}`, err);
             }
         }
     }
@@ -147,15 +133,15 @@ function aggregateProfiles(sessions) {
     let totalToolCalls = 0;
     let totalAgentRuns = 0;
     let totalSkillLoads = 0;
+    let skippedTranscriptLines = 0;
     for (const session of Object.values(sessions)) {
+        if (!session?.toolCalls)
+            continue;
         totalToolCalls += session.toolCalls.length;
+        skippedTranscriptLines += session.skippedLines ?? 0;
         for (const [agentId, count] of Object.entries(session.agentInvocations)) {
             agentInvocations[agentId] = (agentInvocations[agentId] ?? 0) + count;
             totalAgentRuns += count;
-            if (!agentUsedTools[agentId])
-                agentUsedTools[agentId] = new Set();
-            // Tools used by this agent — we get this from tool calls attributed to agent context
-            // For now populate from general tool calls
         }
         for (const ev of session.toolCalls) {
             if (ev.agentId) {
@@ -175,7 +161,17 @@ function aggregateProfiles(sessions) {
             fileExtensions[ext] = (fileExtensions[ext] ?? 0) + count;
         }
     }
-    return { agentInvocations, agentUsedTools, skillLoads, skillApplied, fileExtensions, totalToolCalls, totalAgentRuns, totalSkillLoads };
+    return {
+        agentInvocations,
+        agentUsedTools,
+        skillLoads,
+        skillApplied,
+        fileExtensions,
+        totalToolCalls,
+        totalAgentRuns,
+        totalSkillLoads,
+        skippedTranscriptLines,
+    };
 }
 function computeLanguages(fileExtensions) {
     const total = Object.values(fileExtensions).reduce((s, n) => s + n, 0);
@@ -190,11 +186,10 @@ function computeLanguages(fileExtensions) {
 async function runAnalysis(pluginRoot, claudeRoot) {
     const config = (0, config_js_1.loadConfig)(pluginRoot);
     const cache = (0, incrementalCache_js_1.readProfileCache)(pluginRoot);
-    const history = (0, historyParser_js_1.parseHistory)(claudeRoot, config.read.denyGlobs);
+    const history = await (0, historyParser_js_1.parseHistory)(claudeRoot, config.read.denyGlobs);
     const feedback = (0, feedback_js_1.readFeedbackEntries)(pluginRoot);
     const sessionCount = (0, sessionCounter_js_1.getCount)(pluginRoot);
     const agg = aggregateProfiles(cache.sessions);
-    // Merge history data
     for (const [k, v] of Object.entries(history.skillLoads)) {
         agg.skillLoads[k] = (agg.skillLoads[k] ?? 0) + v;
     }
@@ -209,17 +204,16 @@ async function runAnalysis(pluginRoot, claudeRoot) {
         toolCalls: agg.totalToolCalls,
         agentRuns: agg.totalAgentRuns,
         skillLoads: agg.totalSkillLoads,
+        ...(agg.skippedTranscriptLines > 0 ? { skippedTranscriptLines: agg.skippedTranscriptLines } : {}),
     };
     const languages = computeLanguages(agg.fileExtensions);
-    // Score agents
-    const agentDefs = loadDefinitionFiles(claudeRoot, "agents");
+    const agentDefs = loadDefinitionFiles(claudeRoot, "agents", pluginRoot);
     const agents = agentDefs.map((def) => {
         const invocations = agg.agentInvocations[def.id] ?? 0;
         const usedTools = [...(agg.agentUsedTools[def.id] ?? new Set())];
         return (0, scorer_js_1.scoreTarget)({ id: def.id, path: def.relativePath, invocations, declaredTools: def.declaredTools, usedTools, sections: def.sections, rawContent: def.rawContent, loads: 0, applied: 0 }, totals, config, "agent");
     });
-    // Score skills
-    const skillDefs = loadDefinitionFiles(claudeRoot, "skills");
+    const skillDefs = loadDefinitionFiles(claudeRoot, "skills", pluginRoot);
     const skills = skillDefs.map((def) => {
         const loads = agg.skillLoads[def.id] ?? 0;
         const applied = agg.skillApplied[def.id] ?? 0;
@@ -235,7 +229,6 @@ async function runAnalysis(pluginRoot, claudeRoot) {
         skills,
         feedback,
     };
-    // Write atomically
     const analysisPath = path.join(pluginRoot, "data", "analysis.json");
     fs.mkdirSync(path.dirname(analysisPath), { recursive: true });
     const tmp = analysisPath + ".tmp";

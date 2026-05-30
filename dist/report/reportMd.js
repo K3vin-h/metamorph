@@ -37,102 +37,80 @@ exports.generateReportMd = generateReportMd;
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const config_js_1 = require("../config.js");
-function scoreBar(score) {
-    const filled = Math.round(score / 10);
-    return "█".repeat(filled) + "░".repeat(10 - filled) + ` ${score}`;
+function shortFlagLabel(flags) {
+    if (flags.length === 0)
+        return "ok";
+    const f = flags[0];
+    switch (f.type) {
+        case "never-invoked-agent": return "never-invoked";
+        case "rarely-used-agent": return "rarely-used";
+        case "hot-path": return "hot-path";
+        case "dead-section": return "dead-section";
+        case "low-confidence-dead-section": return "low-confidence-dead-section";
+        case "unused-tool": return `unused-tool:${f.target ?? ""}`;
+        case "never-applied-skill": return "never-applied";
+        default: return f.type;
+    }
 }
-function topFlag(target) {
-    if (target.flags.length === 0)
-        return "—";
-    const f = target.flags[0];
-    return `${f.type}${f.target ? ` (${f.target})` : ""}${f.section ? ` "${f.section}"` : ""} [${f.confidence}]`;
+function groupByFlag(targets) {
+    const groups = new Map();
+    for (const t of targets) {
+        const label = shortFlagLabel(t.flags);
+        if (!groups.has(label))
+            groups.set(label, { ids: [], scores: [] });
+        const g = groups.get(label);
+        g.ids.push(t.id);
+        g.scores.push(t.score);
+    }
+    return groups;
+}
+function median(scores) {
+    const sorted = [...scores].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 === 0
+        ? Math.round((sorted[mid - 1] + sorted[mid]) / 2)
+        : sorted[mid];
 }
 function generateReportMd(pluginRoot, analysis) {
     const config = (0, config_js_1.loadConfig)(pluginRoot);
-    const { sessionCount, totals, agents, skills, languages, feedback } = analysis;
+    const { sessionCount, totals, agents, skills, languages } = analysis;
     const warmupMet = sessionCount >= config.warmupSessions;
     const lines = [];
-    lines.push("# metamorph — Habits Dashboard");
-    lines.push(`_Generated: ${new Date(analysis.generatedAt).toLocaleString()}_`);
+    const statusLine = warmupMet
+        ? `# metamorph · ready`
+        : `# metamorph · ${sessionCount}/${config.warmupSessions} warming up`;
+    lines.push(statusLine);
+    lines.push(`Sessions: ${totals.sessions} · Tools: ${totals.toolCalls} · Agents: ${totals.agentRuns} · Skills: ${totals.skillLoads} · Privacy: ${analysis.readMode}`);
     lines.push("");
-    // Warm-up banner
-    if (!warmupMet) {
-        lines.push(`> **Warming up: ${sessionCount}/${config.warmupSessions} sessions**`);
-        lines.push("> Collecting data — improvement suggestions unlock after warm-up.");
+    // Language distribution (single line)
+    const langEntries = Object.entries(languages).sort((a, b) => b[1] - a[1]);
+    if (langEntries.length > 0) {
+        const langStr = langEntries.map(([l, p]) => `${l}:${(p * 100).toFixed(0)}%`).join(", ");
+        lines.push(`Languages: ${langStr}`);
         lines.push("");
     }
-    // Summary stats
-    lines.push("## Summary");
-    lines.push("");
-    lines.push(`| Metric | Value |`);
-    lines.push(`|--------|-------|`);
-    lines.push(`| Sessions analyzed | ${totals.sessions} |`);
-    lines.push(`| Tool calls | ${totals.toolCalls} |`);
-    lines.push(`| Agent runs | ${totals.agentRuns} |`);
-    lines.push(`| Skill loads | ${totals.skillLoads} |`);
-    lines.push(`| Privacy mode | ${analysis.readMode} |`);
-    lines.push("");
-    // Language distribution
-    if (Object.keys(languages).length > 0) {
-        lines.push("## Language Distribution");
-        lines.push("");
-        const sorted = Object.entries(languages).sort((a, b) => b[1] - a[1]);
-        for (const [lang, pct] of sorted) {
-            lines.push(`- \`${lang}\`: ${(pct * 100).toFixed(0)}%`);
-        }
-        lines.push("");
-    }
-    // Agents table
+    // Agents grouped by flag
     if (agents.length > 0) {
         lines.push("## Agents");
-        lines.push("");
-        lines.push(`| Agent | Score | Invocations | Top Flag |`);
-        lines.push(`|-------|-------|-------------|----------|`);
-        for (const a of agents.sort((x, y) => x.score - y.score)) {
-            lines.push(`| \`${a.id}\` | ${scoreBar(a.score)} | ${a.invocations} | ${topFlag(a)} |`);
+        const groups = groupByFlag(agents.sort((a, b) => a.score - b.score));
+        for (const [label, { ids, scores }] of groups) {
+            lines.push(`${label} (${median(scores)}): ${ids.join(", ")}`);
         }
         lines.push("");
     }
-    // Skills table
+    // Skills grouped by flag
     if (skills.length > 0) {
         lines.push("## Skills");
-        lines.push("");
-        lines.push(`| Skill | Score | Loads | Top Flag |`);
-        lines.push(`|-------|-------|-------|----------|`);
-        for (const s of skills.sort((x, y) => x.score - y.score)) {
-            lines.push(`| \`${s.id}\` | ${scoreBar(s.score)} | ${s.invocations} | ${topFlag(s)} |`);
+        const groups = groupByFlag(skills.sort((a, b) => a.score - b.score));
+        for (const [label, { ids, scores }] of groups) {
+            lines.push(`${label} (${median(scores)}): ${ids.join(", ")}`);
         }
         lines.push("");
     }
-    // Flagged targets detail
-    const flagged = [...agents, ...skills].filter((t) => t.flags.some((f) => f.confidence === "high" || t.score < config.flagThreshold));
-    if (flagged.length > 0) {
-        lines.push("## Flagged Targets");
-        lines.push("");
-        for (const t of flagged.sort((a, b) => a.score - b.score)) {
-            lines.push(`### \`${t.id}\` (score: ${t.score})`);
-            for (const f of t.flags) {
-                lines.push(`- **${f.type}**${f.target ? ` — \`${f.target}\`` : ""}${f.section ? ` — "${f.section}"` : ""} [${f.confidence} confidence]`);
-            }
-            if (warmupMet) {
-                lines.push(`  → \`/metamorph --target ${t.id}\``);
-            }
-            lines.push("");
-        }
-    }
-    // Feedback
-    if (feedback.length > 0) {
-        lines.push("## Feedback");
-        lines.push("");
-        for (const entry of feedback) {
-            lines.push(`- ${entry}`);
-        }
-        lines.push("");
-    }
-    if (warmupMet) {
-        lines.push("---");
-        lines.push("Run `/metamorph` to see improvement suggestions.");
-    }
+    const actionLine = warmupMet
+        ? "Run /metamorph for suggestions · Target any: /metamorph --target <id> · View: /metamorph-report"
+        : "Suggestions unlock after warm-up · Target any: /metamorph --target <id> · View: /metamorph-report";
+    lines.push(actionLine);
     const reportPath = path.join(pluginRoot, "report.md");
     fs.writeFileSync(reportPath, lines.join("\n"), "utf8");
 }

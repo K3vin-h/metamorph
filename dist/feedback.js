@@ -41,10 +41,12 @@ const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const FEEDBACK_LOG = (pluginRoot) => path.join(pluginRoot, "data", "feedback.log");
 const MAX_ENTRIES = 200;
+const MAX_FEEDBACK_LENGTH = 2000;
 function addFeedback(pluginRoot, text) {
     const logPath = FEEDBACK_LOG(pluginRoot);
     fs.mkdirSync(path.dirname(logPath), { recursive: true });
-    const entry = `[${new Date().toISOString()}] ${text.trim()}\n`;
+    const trimmed = text.trim().slice(0, MAX_FEEDBACK_LENGTH);
+    const entry = `[${new Date().toISOString()}] ${trimmed}\n`;
     fs.appendFileSync(logPath, entry, "utf8");
 }
 function listFeedback(pluginRoot) {

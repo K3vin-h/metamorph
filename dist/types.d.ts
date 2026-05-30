@@ -13,7 +13,7 @@ export interface Config {
         targets: {
             agents: boolean;
             skills: boolean;
-            claudeMd: boolean;
+            claudeMd: "global" | "local" | "both" | false;
         };
         allow: string[];
         deny: string[];
@@ -86,6 +86,7 @@ export interface AnalysisTotals {
     toolCalls: number;
     agentRuns: number;
     skillLoads: number;
+    skippedTranscriptLines?: number;
 }
 export interface AnalysisResult {
     generatedAt: string;
@@ -104,13 +105,18 @@ export interface StyleProfile {
     numberedLists: boolean;
     toneKeywords: string[];
     avgSectionLength: number;
+    derivedFromFiles?: number;
 }
 export interface BackupManifestEntry {
     originalPath: string;
-    backupPath: string;
+    backupPath: string | null;
     runId: string;
     timestamp: string;
     writtenChecksum: string;
+}
+export interface FailedSessionEntry {
+    error: string;
+    skippedAt: string;
 }
 export interface BackupManifest {
     entries: Record<string, BackupManifestEntry>;
@@ -121,6 +127,7 @@ export interface SessionCounter {
 }
 export interface ProfileCache {
     sessions: Record<string, SessionProfile>;
+    failedSessions?: Record<string, FailedSessionEntry>;
 }
 export type CommandResult = {
     ok: true;

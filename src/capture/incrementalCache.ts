@@ -1,22 +1,44 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-import type { ProfileCache, SessionProfile } from "../types.js";
+import type { ProfileCache } from "../types.js";
 import { loadConfig } from "../config.js";
 import { parseTranscript } from "./transcriptParser.js";
+import { logHookError } from "../hookErrors.js";
 
 const cachePath = (pluginRoot: string) => path.join(pluginRoot, "data", "profile.json");
+const MAX_CACHE_SESSIONS = 500;
 
 function readCache(pluginRoot: string): ProfileCache {
   const p = cachePath(pluginRoot);
   try {
-    return JSON.parse(fs.readFileSync(p, "utf8"));
+    const raw = JSON.parse(fs.readFileSync(p, "utf8"));
+    return {
+      sessions: raw.sessions ?? {},
+      failedSessions: raw.failedSessions ?? {},
+    };
   } catch {
-    return { sessions: {} };
+    return { sessions: {}, failedSessions: {} };
+  }
+}
+
+function trimCache(cache: ProfileCache): void {
+  const ids = Object.keys(cache.sessions);
+  if (ids.length <= MAX_CACHE_SESSIONS) return;
+
+  const sorted = ids.sort((a, b) => {
+    const ta = cache.sessions[a]?.capturedAt ?? "";
+    const tb = cache.sessions[b]?.capturedAt ?? "";
+    return ta.localeCompare(tb);
+  });
+
+  for (const id of sorted.slice(0, ids.length - MAX_CACHE_SESSIONS)) {
+    delete cache.sessions[id];
   }
 }
 
 function writeCache(pluginRoot: string, cache: ProfileCache): void {
+  trimCache(cache);
   const p = cachePath(pluginRoot);
   fs.mkdirSync(path.dirname(p), { recursive: true });
   const tmp = p + ".tmp";
@@ -24,7 +46,25 @@ function writeCache(pluginRoot: string, cache: ProfileCache): void {
   fs.renameSync(tmp, p);
 }
 
-function findTranscriptFiles(claudeRoot: string): Array<{ sessionId: string; filePath: string }> {
+function recordParseFailure(
+  cache: ProfileCache,
+  sessionId: string,
+  err: unknown,
+  pluginRoot: string,
+  label: string
+): void {
+  if (!cache.failedSessions) cache.failedSessions = {};
+  cache.failedSessions[sessionId] = {
+    error: err instanceof Error ? err.message : String(err),
+    skippedAt: new Date().toISOString(),
+  };
+  logHookError(pluginRoot, label, err);
+}
+
+function findTranscriptFiles(
+  claudeRoot: string,
+  pluginRoot: string
+): Array<{ sessionId: string; filePath: string }> {
   const projectsDir = path.join(claudeRoot, "projects");
   const results: Array<{ sessionId: string; filePath: string }> = [];
 
@@ -42,16 +82,14 @@ function findTranscriptFiles(claudeRoot: string): Array<{ sessionId: string; fil
           results.push({ sessionId: file.replace(".jsonl", ""), filePath: path.join(dir, file) });
         }
       }
-    } catch {
-      // skip unreadable dirs
+    } catch (err) {
+      logHookError(pluginRoot, `transcript-scan:${dir}`, err);
     }
   }
 
   return results;
 }
 
-// currentSessionId is passed so the call mapping built below can include the current session's
-// Agent calls, ensuring subagent transcripts for this session are attributed correctly.
 export async function updateCache(
   pluginRoot: string,
   claudeRoot: string,
@@ -59,10 +97,12 @@ export async function updateCache(
 ): Promise<ProfileCache> {
   const config = loadConfig(pluginRoot);
   const cache = readCache(pluginRoot);
-  const transcripts = findTranscriptFiles(claudeRoot);
+  if (!cache.failedSessions) cache.failedSessions = {};
+
+  const transcripts = findTranscriptFiles(claudeRoot, pluginRoot);
 
   for (const { sessionId, filePath } of transcripts) {
-    if (cache.sessions[sessionId]) continue; // already parsed
+    if (cache.sessions[sessionId] || cache.failedSessions[sessionId]) continue;
 
     try {
       const profile = await parseTranscript(
@@ -73,18 +113,17 @@ export async function updateCache(
         claudeRoot
       );
       cache.sessions[sessionId] = profile;
-    } catch {
-      // skip unparseable transcripts
+    } catch (err) {
+      recordParseFailure(cache, sessionId, err, pluginRoot, `parse-transcript:${sessionId}`);
     }
   }
 
-  // Build a global map: agentCallId → agentType from all parsed parent sessions
   const callIdToAgentType: Record<string, string> = {};
   for (const profile of Object.values(cache.sessions)) {
+    if (!profile || !("agentCallMappings" in profile)) continue;
     Object.assign(callIdToAgentType, profile.agentCallMappings);
   }
 
-  // Parse subagent transcripts, attributing tool calls to the correct agent type
   const projectsDir = path.join(claudeRoot, "projects");
   if (fs.existsSync(projectsDir)) {
     for (const projectDir of fs.readdirSync(projectsDir, { withFileTypes: true })
@@ -94,10 +133,9 @@ export async function updateCache(
       if (!fs.existsSync(subagentDir)) continue;
       for (const file of fs.readdirSync(subagentDir)) {
         if (!file.endsWith(".jsonl")) continue;
-        // subagent files are named like "agent-<callId>.jsonl"
         const callId = file.replace(/^agent-/, "").replace(".jsonl", "");
         const subSessionId = `sub-${callId}`;
-        if (cache.sessions[subSessionId]) continue;
+        if (cache.sessions[subSessionId] || cache.failedSessions[subSessionId]) continue;
         try {
           const profile = await parseTranscript(
             path.join(subagentDir, file),
@@ -106,18 +144,16 @@ export async function updateCache(
             config.read.denyGlobs,
             claudeRoot
           );
-          // If we can identify the agent type from the call mapping, annotate all tool calls
           const agentType = callIdToAgentType[callId];
           if (agentType) {
             for (const ev of profile.toolCalls) {
               ev.agentId = agentType;
             }
-            // Count this subagent transcript as one invocation of the agent type
             profile.agentInvocations[agentType] = (profile.agentInvocations[agentType] ?? 0) + 1;
           }
           cache.sessions[subSessionId] = profile;
-        } catch {
-          // skip
+        } catch (err) {
+          recordParseFailure(cache, subSessionId, err, pluginRoot, `parse-subagent:${subSessionId}`);
         }
       }
     }

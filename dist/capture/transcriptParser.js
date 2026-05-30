@@ -70,7 +70,7 @@ async function parseTranscript(transcriptPath, sessionId, mode, denyGlobs, claud
             for (const block of raw.content) {
                 if (block.type === "tool_use" && block.name === "Agent" && block.id) {
                     const agentType = block.input?.subagent_type;
-                    if (typeof agentType === "string" && block.id) {
+                    if (typeof agentType === "string") {
                         profile.agentCallMappings[block.id] = agentType;
                     }
                 }

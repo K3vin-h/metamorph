@@ -1,4 +1,5 @@
 import type { AgentProfile, AnalysisTotals, Config, Flag, FlagType } from "../types.js";
+import { scrubSecrets } from "../security.js";
 
 interface TargetData {
   id: string;
@@ -23,14 +24,12 @@ const SECTION_KEYWORDS: Record<string, string[]> = {
 
 function computeSectionScore(
   sections: string[],
-  rawContent: string,
-  usedTools: string[],
-  readMode: string
+  _rawContent: string,
+  usedTools: string[]
 ): { score: number; deadSections: string[] } {
   if (sections.length === 0) return { score: 100, deadSections: [] };
 
   const deadSections: string[] = [];
-  const contentLower = rawContent.toLowerCase();
   const usedToolsLower = usedTools.map((t) => t.toLowerCase());
 
   let hitCount = 0;
@@ -82,8 +81,7 @@ export function scoreTarget(
   const { score: sectionScore, deadSections } = computeSectionScore(
     sections,
     rawContent,
-    usedTools,
-    readMode
+    usedTools
   );
 
   // Skill apply score (10%) — only meaningful for skills
@@ -133,7 +131,9 @@ export function scoreTarget(
   for (const flag of flags) {
     if (flag.section) {
       const sectionContent = extractSectionContent(rawContent, flag.section);
-      if (sectionContent) flaggedSectionText[flag.section] = sectionContent;
+      if (sectionContent) {
+        flaggedSectionText[flag.section] = scrubSecrets(sectionContent);
+      }
     }
   }
 
