@@ -101,11 +101,15 @@ async function rollbackFile(pluginRoot, filePath) {
     if (!entry.backupPath) {
         return { ok: false, error: `No backup for ${relPath} — metamorph created this file; delete it manually if needed.` };
     }
-    const confinedTarget = (0, security_js_1.confinePath)(entry.originalPath, [claudeRoot]);
+    const projectRoot = (0, permissions_js_1.resolveProjectRoot)();
+    const allowedRoots = [claudeRoot];
+    if (projectRoot)
+        allowedRoots.push(projectRoot);
+    const confinedTarget = (0, security_js_1.confinePath)(entry.originalPath, allowedRoots);
     if (!confinedTarget) {
         return { ok: false, error: `Restore rejected: target path is outside allowed roots: ${entry.originalPath}` };
     }
-    const perm = (0, permissions_js_1.checkWritePermission)(confinedTarget, config, claudeRoot);
+    const perm = (0, permissions_js_1.checkWritePermission)(confinedTarget, config, claudeRoot, projectRoot);
     if (!perm.allowed) {
         return { ok: false, error: `Restore rejected: write permission denied (${perm.reason}) for ${relPath}` };
     }

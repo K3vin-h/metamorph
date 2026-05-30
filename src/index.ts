@@ -59,9 +59,16 @@ async function runFeedbackClear(): Promise<void> {
   console.log("Feedback log cleared.");
 }
 
-async function runPrepareImprove(targetId: string): Promise<void> {
-  const { prepareImprove } = await import("./improve/improver.js");
-  await prepareImprove(DATA_ROOT, CLAUDE_ROOT, targetId);
+async function runPrepareImprove(targetId: string, runId?: string): Promise<void> {
+  const { prepareImprove, formatPrepareBatchResult } = await import("./improve/improver.js");
+  const result = await prepareImprove(DATA_ROOT, CLAUDE_ROOT, targetId, runId);
+  console.log(formatPrepareBatchResult(result));
+}
+
+async function runPrepareImproveBatch(targetIds: string[]): Promise<void> {
+  const { prepareImproveBatch, formatPrepareBatchResult } = await import("./improve/improver.js");
+  const result = await prepareImproveBatch(DATA_ROOT, CLAUDE_ROOT, targetIds);
+  console.log(formatPrepareBatchResult(result));
 }
 
 async function runImproveApprove(id: string): Promise<void> {
@@ -122,7 +129,10 @@ async function main(): Promise<void> {
         await runFeedbackClear();
         break;
       case "prepare-improve":
-        await runPrepareImprove(args[0]);
+        await runPrepareImprove(args[0], args[1]);
+        break;
+      case "prepare-improve-batch":
+        await runPrepareImproveBatch(args);
         break;
       case "improve-approve":
         await runImproveApprove(args[0]);

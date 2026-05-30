@@ -84,9 +84,15 @@ async function runFeedbackClear() {
     clearFeedback(DATA_ROOT);
     console.log("Feedback log cleared.");
 }
-async function runPrepareImprove(targetId) {
-    const { prepareImprove } = await Promise.resolve().then(() => __importStar(require("./improve/improver.js")));
-    await prepareImprove(DATA_ROOT, CLAUDE_ROOT, targetId);
+async function runPrepareImprove(targetId, runId) {
+    const { prepareImprove, formatPrepareBatchResult } = await Promise.resolve().then(() => __importStar(require("./improve/improver.js")));
+    const result = await prepareImprove(DATA_ROOT, CLAUDE_ROOT, targetId, runId);
+    console.log(formatPrepareBatchResult(result));
+}
+async function runPrepareImproveBatch(targetIds) {
+    const { prepareImproveBatch, formatPrepareBatchResult } = await Promise.resolve().then(() => __importStar(require("./improve/improver.js")));
+    const result = await prepareImproveBatch(DATA_ROOT, CLAUDE_ROOT, targetIds);
+    console.log(formatPrepareBatchResult(result));
 }
 async function runImproveApprove(id) {
     const { approveImprovement } = await Promise.resolve().then(() => __importStar(require("./improve/improver.js")));
@@ -139,7 +145,10 @@ async function main() {
                 await runFeedbackClear();
                 break;
             case "prepare-improve":
-                await runPrepareImprove(args[0]);
+                await runPrepareImprove(args[0], args[1]);
+                break;
+            case "prepare-improve-batch":
+                await runPrepareImproveBatch(args);
                 break;
             case "improve-approve":
                 await runImproveApprove(args[0]);

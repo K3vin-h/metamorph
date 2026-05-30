@@ -42,6 +42,17 @@ const security_js_1 = require("../security.js");
 const permissions_js_1 = require("../permissions.js");
 const utils_js_1 = require("../utils.js");
 const hookErrors_js_1 = require("../hookErrors.js");
+function manifestRelPath(confined, claudeRoot, projectRoot) {
+    const relFromClaude = path.relative(claudeRoot, confined);
+    if (!relFromClaude.startsWith(".."))
+        return relFromClaude;
+    if (projectRoot) {
+        const relFromProject = path.relative(projectRoot, confined);
+        if (!relFromProject.startsWith(".."))
+            return relFromProject;
+    }
+    return confined;
+}
 const manifestPath = (pluginRoot) => path.join(pluginRoot, "backups", "manifest.json");
 function readManifest(pluginRoot) {
     try {
@@ -74,12 +85,15 @@ function validateContent(content) {
 }
 async function writeWithBackup(targetPath, proposedContent, runId, config, pluginRoot) {
     const claudeRoot = path.join(os.homedir(), ".claude");
+    const projectRoot = (0, permissions_js_1.resolveProjectRoot)();
     const allowedRoots = [claudeRoot];
+    if (projectRoot)
+        allowedRoots.push(projectRoot);
     const confined = (0, security_js_1.confinePath)(targetPath, allowedRoots);
     if (!confined) {
         return { ok: false, error: `Path rejected: ${targetPath} is outside allowed roots or uses path traversal` };
     }
-    const perm = (0, permissions_js_1.checkWritePermission)(confined, config, claudeRoot);
+    const perm = (0, permissions_js_1.checkWritePermission)(confined, config, claudeRoot, projectRoot);
     if (!perm.allowed) {
         return { ok: false, error: `Write permission denied: ${perm.reason} for ${confined}` };
     }
@@ -95,7 +109,7 @@ async function writeWithBackup(targetPath, proposedContent, runId, config, plugi
         return { ok: false, error: `Failed to write temp file: ${err}` };
     }
     const manifest = readManifest(pluginRoot);
-    const relPath = path.relative(claudeRoot, confined);
+    const relPath = manifestRelPath(confined, claudeRoot, projectRoot);
     const existingEntry = manifest.entries[relPath];
     let currentContent = "";
     try {

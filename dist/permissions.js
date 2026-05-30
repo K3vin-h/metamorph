@@ -33,9 +33,12 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.resolveProjectRoot = resolveProjectRoot;
+exports.localClaudeMdPath = localClaudeMdPath;
 exports.checkWritePermission = checkWritePermission;
 exports.checkReadPermission = checkReadPermission;
 exports.matchGlob = matchGlob;
+const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 function globToRegex(pattern) {
     const escapeRegex = (s) => s.replace(/[.+^${}()|[\]\\]/g, "\\$&");
@@ -62,6 +65,28 @@ function matchGlob(pattern, filePath) {
     const regex = new RegExp(globToRegex(pattern));
     return regex.test(filePath);
 }
+function resolveProjectRoot() {
+    const candidates = [
+        process.env.CLAUDE_PROJECT_DIR,
+        process.env.CLAUDE_CODE_PROJECT_DIR,
+        process.cwd(),
+    ].filter((v) => typeof v === "string" && v.trim().length > 0);
+    for (const candidate of candidates) {
+        const resolved = path.resolve(candidate);
+        try {
+            if (fs.existsSync(resolved) && fs.statSync(resolved).isDirectory()) {
+                return resolved;
+            }
+        }
+        catch {
+            continue;
+        }
+    }
+    return null;
+}
+function localClaudeMdPath(projectRoot) {
+    return path.join(projectRoot, ".claude", "CLAUDE.md");
+}
 function getCategory(resolvedPath, claudeRoot) {
     const rel = path.relative(claudeRoot, resolvedPath);
     if (rel.startsWith("agents" + path.sep) || rel === "agents")
@@ -72,9 +97,39 @@ function getCategory(resolvedPath, claudeRoot) {
         return "claudeMd";
     return null;
 }
-function checkWritePermission(resolvedPath, config, claudeRoot) {
+function claudeMdScopeAllowed(resolvedPath, config, claudeRoot, projectRoot) {
+    const scope = config.write.targets.claudeMd;
+    if (!scope)
+        return null;
+    const globalPath = path.join(claudeRoot, "CLAUDE.md");
+    if (path.resolve(resolvedPath) === path.resolve(globalPath)) {
+        if (scope === "global" || scope === "both")
+            return { allowed: true, reason: "ok" };
+        return { allowed: false, reason: "category-disabled" };
+    }
+    if (projectRoot) {
+        const localPath = localClaudeMdPath(projectRoot);
+        if (path.resolve(resolvedPath) === path.resolve(localPath)) {
+            if (scope === "local" || scope === "both")
+                return { allowed: true, reason: "ok" };
+            return { allowed: false, reason: "category-disabled" };
+        }
+    }
+    return null;
+}
+function checkWritePermission(resolvedPath, config, claudeRoot, projectRoot = resolveProjectRoot()) {
     if (resolvedPath.includes("..")) {
         return { allowed: false, reason: "path-traversal" };
+    }
+    const claudeMdResult = claudeMdScopeAllowed(resolvedPath, config, claudeRoot, projectRoot);
+    if (claudeMdResult) {
+        for (const denyGlob of config.write.deny) {
+            const relFromClaude = path.relative(claudeRoot, resolvedPath);
+            if (!relFromClaude.startsWith("..") && matchGlob(denyGlob, relFromClaude)) {
+                return { allowed: false, reason: "deny-glob" };
+            }
+        }
+        return claudeMdResult;
     }
     const rel = path.relative(claudeRoot, resolvedPath);
     if (rel.startsWith("..")) {
@@ -82,7 +137,12 @@ function checkWritePermission(resolvedPath, config, claudeRoot) {
     }
     const category = getCategory(resolvedPath, claudeRoot);
     if (category !== null) {
-        if (!config.write.targets[category]) {
+        if (category === "claudeMd") {
+            if (!config.write.targets.claudeMd) {
+                return { allowed: false, reason: "category-disabled" };
+            }
+        }
+        else if (!config.write.targets[category]) {
             return { allowed: false, reason: "category-disabled" };
         }
     }

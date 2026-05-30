@@ -3,7 +3,7 @@ import * as path from "path";
 import * as os from "os";
 import type { CommandResult } from "../types.js";
 import { sha256, confinePath } from "../security.js";
-import { checkWritePermission } from "../permissions.js";
+import { checkWritePermission, resolveProjectRoot } from "../permissions.js";
 import { readManifest } from "./writer.js";
 import { loadConfig } from "../config.js";
 import { isNodeError } from "../hookErrors.js";
@@ -74,11 +74,15 @@ export async function rollbackFile(pluginRoot: string, filePath: string): Promis
     return { ok: false, error: `No backup for ${relPath} — metamorph created this file; delete it manually if needed.` };
   }
 
-  const confinedTarget = confinePath(entry.originalPath, [claudeRoot]);
+  const projectRoot = resolveProjectRoot();
+  const allowedRoots = [claudeRoot];
+  if (projectRoot) allowedRoots.push(projectRoot);
+
+  const confinedTarget = confinePath(entry.originalPath, allowedRoots);
   if (!confinedTarget) {
     return { ok: false, error: `Restore rejected: target path is outside allowed roots: ${entry.originalPath}` };
   }
-  const perm = checkWritePermission(confinedTarget, config, claudeRoot);
+  const perm = checkWritePermission(confinedTarget, config, claudeRoot, projectRoot);
   if (!perm.allowed) {
     return { ok: false, error: `Restore rejected: write permission denied (${perm.reason}) for ${relPath}` };
   }

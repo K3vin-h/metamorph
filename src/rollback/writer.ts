@@ -3,9 +3,19 @@ import * as path from "path";
 import * as os from "os";
 import type { BackupManifest, BackupManifestEntry, CommandResult, Config } from "../types.js";
 import { confinePath, sha256 } from "../security.js";
-import { checkWritePermission } from "../permissions.js";
+import { checkWritePermission, resolveProjectRoot } from "../permissions.js";
 import { parseFrontmatter } from "../utils.js";
 import { logHookError } from "../hookErrors.js";
+
+function manifestRelPath(confined: string, claudeRoot: string, projectRoot: string | null): string {
+  const relFromClaude = path.relative(claudeRoot, confined);
+  if (!relFromClaude.startsWith("..")) return relFromClaude;
+  if (projectRoot) {
+    const relFromProject = path.relative(projectRoot, confined);
+    if (!relFromProject.startsWith("..")) return relFromProject;
+  }
+  return confined;
+}
 
 const manifestPath = (pluginRoot: string) =>
   path.join(pluginRoot, "backups", "manifest.json");
@@ -51,14 +61,16 @@ export async function writeWithBackup(
   pluginRoot: string
 ): Promise<CommandResult> {
   const claudeRoot = path.join(os.homedir(), ".claude");
+  const projectRoot = resolveProjectRoot();
   const allowedRoots = [claudeRoot];
+  if (projectRoot) allowedRoots.push(projectRoot);
 
   const confined = confinePath(targetPath, allowedRoots);
   if (!confined) {
     return { ok: false, error: `Path rejected: ${targetPath} is outside allowed roots or uses path traversal` };
   }
 
-  const perm = checkWritePermission(confined, config, claudeRoot);
+  const perm = checkWritePermission(confined, config, claudeRoot, projectRoot);
   if (!perm.allowed) {
     return { ok: false, error: `Write permission denied: ${perm.reason} for ${confined}` };
   }
@@ -76,7 +88,7 @@ export async function writeWithBackup(
   }
 
   const manifest = readManifest(pluginRoot);
-  const relPath = path.relative(claudeRoot, confined);
+  const relPath = manifestRelPath(confined, claudeRoot, projectRoot);
   const existingEntry = manifest.entries[relPath];
   let currentContent = "";
   try {
