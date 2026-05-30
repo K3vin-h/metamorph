@@ -37,27 +37,7 @@ exports.generateReportMd = generateReportMd;
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const config_js_1 = require("../config.js");
-const flagsShort_js_1 = require("../improve/flagsShort.js");
-const SCORE_MAX = 100;
-function escapeCell(value) {
-    return value.replace(/\|/g, "\\|");
-}
-function targetTable(title, targets) {
-    if (targets.length === 0)
-        return [];
-    const sorted = [...targets].sort((a, b) => a.score - b.score || a.id.localeCompare(b.id));
-    const lines = [
-        `## ${title} (${sorted.length})`,
-        "",
-        "| id | score | flag |",
-        "| --- | ---: | :--- |",
-    ];
-    for (const t of sorted) {
-        lines.push(`| ${escapeCell(t.id)} | ${t.score}/${SCORE_MAX} | ${escapeCell((0, flagsShort_js_1.displayFlag)(t.flags))} |`);
-    }
-    lines.push("");
-    return lines;
-}
+const targetTable_js_1 = require("./targetTable.js");
 function generateReportMd(pluginRoot, analysis) {
     const config = (0, config_js_1.loadConfig)(pluginRoot);
     const { sessionCount, totals, agents, skills, languages } = analysis;
@@ -67,13 +47,16 @@ function generateReportMd(pluginRoot, analysis) {
         ? `# metamorph · ready`
         : `# metamorph · warm-up ${sessionCount}/${config.warmupSessions}`);
     lines.push(`${totals.sessions} sessions · ${totals.toolCalls} tools · ${totals.agentRuns} agent runs · ${totals.skillLoads} skill loads · ${analysis.readMode}`);
-    const langEntries = Object.entries(languages).sort((a, b) => b[1] - a[1]);
+    const langEntries = Object.entries(languages)
+        .filter(([l]) => l.length <= 12 && !l.includes("\n"))
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8);
     if (langEntries.length > 0) {
         lines.push(langEntries.map(([l, p]) => `${l} ${(p * 100).toFixed(0)}%`).join(" · "));
     }
     lines.push("", "_flag: — ok · never · rare · hot · tool · dead · mistake_", "");
-    lines.push(...targetTable("Agents", agents));
-    lines.push(...targetTable("Skills", skills));
+    lines.push(...(0, targetTable_js_1.formatAsciiTargetTable)("Agents", agents));
+    lines.push(...(0, targetTable_js_1.formatAsciiTargetTable)("Skills", skills));
     lines.push(warmupMet
         ? "/metamorph · /metamorph --target <id> · /metamorph-report"
         : "Warm-up — /metamorph-report to view · suggestions after warm-up");

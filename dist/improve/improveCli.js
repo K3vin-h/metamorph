@@ -5,17 +5,7 @@ exports.printImproveTargets = printImproveTargets;
 exports.printImproveStatus = printImproveStatus;
 const config_js_1 = require("../config.js");
 const flagsShort_js_1 = require("./flagsShort.js");
-function targetTableMarkdown(title, targets) {
-    if (targets.length === 0)
-        return "";
-    const sorted = [...targets].sort((a, b) => a.score - b.score || a.id.localeCompare(b.id));
-    const lines = [`## ${title} (${sorted.length})`, "", "| id | score | flag |", "| --- | ---: | :--- |"];
-    for (const t of sorted) {
-        lines.push(`| ${t.id} | ${t.score}/100 | ${(0, flagsShort_js_1.displayFlag)(t.flags)} |`);
-    }
-    lines.push("");
-    return lines.join("\n");
-}
+const targetTable_js_1 = require("../report/targetTable.js");
 function printImproveStats(pluginRoot, analysis) {
     const config = (0, config_js_1.loadConfig)(pluginRoot);
     const { sessionCount, totals } = analysis;
@@ -32,12 +22,15 @@ function printImproveStats(pluginRoot, analysis) {
 }
 function printImproveTargets(pluginRoot, analysis) {
     const config = (0, config_js_1.loadConfig)(pluginRoot);
-    console.log(targetTableMarkdown("Agents", analysis.agents));
-    console.log(targetTableMarkdown("Skills", analysis.skills));
+    for (const line of (0, targetTable_js_1.formatAsciiTargetTable)("Agents", analysis.agents)) {
+        console.log(line);
+    }
+    for (const line of (0, targetTable_js_1.formatAsciiTargetTable)("Skills", analysis.skills)) {
+        console.log(line);
+    }
     console.log(`Max per run: ${config.maxSuggestionsPerRun} (lowest scores kept if you pick more)`);
 }
 function printImproveStatus(pluginRoot, analysis) {
-    const config = (0, config_js_1.loadConfig)(pluginRoot);
     const top = [...analysis.agents, ...analysis.skills]
         .filter((t) => t.flags.length > 0)
         .sort((a, b) => a.score - b.score)

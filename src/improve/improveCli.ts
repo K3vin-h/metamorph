@@ -1,17 +1,7 @@
 import type { AnalysisResult } from "../types.js";
 import { loadConfig } from "../config.js";
-import { displayFlag, shortFlag } from "./flagsShort.js";
-
-function targetTableMarkdown(title: string, targets: AnalysisResult["agents"]): string {
-  if (targets.length === 0) return "";
-  const sorted = [...targets].sort((a, b) => a.score - b.score || a.id.localeCompare(b.id));
-  const lines = [`## ${title} (${sorted.length})`, "", "| id | score | flag |", "| --- | ---: | :--- |"];
-  for (const t of sorted) {
-    lines.push(`| ${t.id} | ${t.score}/100 | ${displayFlag(t.flags)} |`);
-  }
-  lines.push("");
-  return lines.join("\n");
-}
+import { shortFlag } from "./flagsShort.js";
+import { formatAsciiTargetTable } from "../report/targetTable.js";
 
 export function printImproveStats(pluginRoot: string, analysis: AnalysisResult): void {
   const config = loadConfig(pluginRoot);
@@ -33,13 +23,16 @@ export function printImproveStats(pluginRoot: string, analysis: AnalysisResult):
 
 export function printImproveTargets(pluginRoot: string, analysis: AnalysisResult): void {
   const config = loadConfig(pluginRoot);
-  console.log(targetTableMarkdown("Agents", analysis.agents));
-  console.log(targetTableMarkdown("Skills", analysis.skills));
+  for (const line of formatAsciiTargetTable("Agents", analysis.agents)) {
+    console.log(line);
+  }
+  for (const line of formatAsciiTargetTable("Skills", analysis.skills)) {
+    console.log(line);
+  }
   console.log(`Max per run: ${config.maxSuggestionsPerRun} (lowest scores kept if you pick more)`);
 }
 
 export function printImproveStatus(pluginRoot: string, analysis: AnalysisResult): void {
-  const config = loadConfig(pluginRoot);
   const top = [...analysis.agents, ...analysis.skills]
     .filter((t) => t.flags.length > 0)
     .sort((a, b) => a.score - b.score)

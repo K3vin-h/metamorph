@@ -1,6 +1,6 @@
 # metamorph
 
-**Version 1.0.6**
+**Version 1.0.7**
 
 metamorph is a Claude Code plugin that watches how you actually work — which agents you call, which skills you load, and what kinds of files you touch — then suggests small improvements to your agent and skill files so they better match your real habits.
 
