@@ -33,11 +33,29 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.refreshReportFromDisk = refreshReportFromDisk;
 exports.generateReportMd = generateReportMd;
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const config_js_1 = require("../config.js");
 const targetTable_js_1 = require("./targetTable.js");
+/** Regenerate report.md from data/analysis.json (updates format after plugin upgrades). */
+function refreshReportFromDisk(pluginRoot) {
+    const analysisPath = path.join(pluginRoot, "data", "analysis.json");
+    if (!fs.existsSync(analysisPath))
+        return false;
+    try {
+        const analysis = JSON.parse(fs.readFileSync(analysisPath, "utf8"));
+        if (typeof analysis.sessionCount !== "number" || !Array.isArray(analysis.agents)) {
+            return false;
+        }
+        generateReportMd(pluginRoot, analysis);
+        return true;
+    }
+    catch {
+        return false;
+    }
+}
 function generateReportMd(pluginRoot, analysis) {
     const config = (0, config_js_1.loadConfig)(pluginRoot);
     const { sessionCount, totals, agents, skills, languages } = analysis;

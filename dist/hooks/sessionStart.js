@@ -66,6 +66,13 @@ async function sessionStart(pluginRoot, _claudeRoot) {
         return;
     }
     const analysis = parsed;
+    try {
+        const { refreshReportFromDisk } = await Promise.resolve().then(() => __importStar(require("../report/reportMd.js")));
+        refreshReportFromDisk(pluginRoot);
+    }
+    catch {
+        // Non-fatal — session end will retry report generation
+    }
     const config = (0, config_js_1.loadConfig)(pluginRoot);
     const { sessionCount, totals, agents, skills } = analysis;
     const warmupMet = sessionCount >= config.warmupSessions;

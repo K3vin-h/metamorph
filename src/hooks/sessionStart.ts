@@ -37,6 +37,14 @@ export async function sessionStart(pluginRoot: string, _claudeRoot: string): Pro
   }
 
   const analysis = parsed;
+
+  try {
+    const { refreshReportFromDisk } = await import("../report/reportMd.js");
+    refreshReportFromDisk(pluginRoot);
+  } catch {
+    // Non-fatal — session end will retry report generation
+  }
+
   const config = loadConfig(pluginRoot);
   const { sessionCount, totals, agents, skills } = analysis;
   const warmupMet = sessionCount >= config.warmupSessions;

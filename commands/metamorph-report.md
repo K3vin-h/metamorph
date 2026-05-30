@@ -9,7 +9,15 @@ Display the metamorph habits dashboard.
 
 ---
 
-Read `${CLAUDE_PLUGIN_DATA}/report.md` and print its **full contents verbatim** in a fenced code block (preserves box-drawing tables):
+**Step 1 — Refresh report (required).** Regenerates `report.md` with current table format:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/dist/index.js" report-refresh
+```
+
+If output is `No analysis.json found`, print that and stop.
+
+**Step 2 — Display.** Read `${CLAUDE_PLUGIN_DATA}/report.md` and print its **full contents verbatim** inside a fenced code block:
 
 ````
 ```text
@@ -17,19 +25,17 @@ Read `${CLAUDE_PLUGIN_DATA}/report.md` and print its **full contents verbatim** 
 ```
 ````
 
-Do not convert tables to markdown pipe format. Do not summarize or trim rows.
+Rules:
+- Do **not** convert tables to markdown pipes or plain `id / sc / flag` columns.
+- Do **not** summarize or skip rows.
+- Preserve box-drawing lines exactly (`│`, `├`, `┼`, `┤`, `─`).
 
-If the file does not exist:
-
-```
-No report yet — run a session to generate one.
-Dashboard is generated automatically at the end of each session.
-```
-
-Expected table shape (same as `/metamorph`):
+Expected table shape:
 
 ```
 │ id                   │ score  │ flag  │
 ├──────────────────────┼────────┼───────┤
 │ backend-patterns     │ 40/100 │ never │
 ```
+
+If `report-refresh` succeeded but the file is missing, say so and suggest running a session.

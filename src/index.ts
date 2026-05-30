@@ -112,6 +112,15 @@ async function runImproveTargets(): Promise<void> {
   printImproveTargets(DATA_ROOT, analysis);
 }
 
+async function runReportRefresh(): Promise<void> {
+  const { refreshReportFromDisk } = await import("./report/reportMd.js");
+  if (refreshReportFromDisk(DATA_ROOT)) {
+    console.log(`Report updated: ${path.join(DATA_ROOT, "report.md")}`);
+    return;
+  }
+  console.log("No analysis.json found. Run a session first.");
+}
+
 async function runImproveStatus(): Promise<void> {
   const fs = await import("fs");
   const path = await import("path");
@@ -190,6 +199,9 @@ async function main(): Promise<void> {
         break;
       case "improve-status":
         await runImproveStatus();
+        break;
+      case "report-refresh":
+        await runReportRefresh();
         break;
       case "rollback-list":
         await runRollbackList();

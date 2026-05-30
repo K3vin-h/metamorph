@@ -130,6 +130,14 @@ async function runImproveTargets() {
     const { printImproveTargets } = await Promise.resolve().then(() => __importStar(require("./improve/improveCli.js")));
     printImproveTargets(DATA_ROOT, analysis);
 }
+async function runReportRefresh() {
+    const { refreshReportFromDisk } = await Promise.resolve().then(() => __importStar(require("./report/reportMd.js")));
+    if (refreshReportFromDisk(DATA_ROOT)) {
+        console.log(`Report updated: ${path.join(DATA_ROOT, "report.md")}`);
+        return;
+    }
+    console.log("No analysis.json found. Run a session first.");
+}
 async function runImproveStatus() {
     const fs = await Promise.resolve().then(() => __importStar(require("fs")));
     const path = await Promise.resolve().then(() => __importStar(require("path")));
@@ -203,6 +211,9 @@ async function main() {
                 break;
             case "improve-status":
                 await runImproveStatus();
+                break;
+            case "report-refresh":
+                await runReportRefresh();
                 break;
             case "rollback-list":
                 await runRollbackList();

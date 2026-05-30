@@ -105,7 +105,7 @@ function ensurePersistentData(pluginRoot, dataRoot) {
         copyPathIfMissing(path.join(candidate, "data"), path.join(dataRoot, "data"));
         copyPathIfMissing(path.join(candidate, "suggestions"), path.join(dataRoot, "suggestions"));
         copyPathIfMissing(path.join(candidate, "backups"), path.join(dataRoot, "backups"));
-        copyPathIfMissing(path.join(candidate, "report.md"), path.join(dataRoot, "report.md"));
+        // report.md is always generated from analysis.json — never copy a stale bundle copy
     }
 }
 //# sourceMappingURL=runtime.js.map
