@@ -106,6 +106,42 @@ async function runImproveList() {
     const { listImprovements } = await Promise.resolve().then(() => __importStar(require("./improve/improver.js")));
     console.log(listImprovements(DATA_ROOT));
 }
+async function runImproveStats() {
+    const fs = await Promise.resolve().then(() => __importStar(require("fs")));
+    const path = await Promise.resolve().then(() => __importStar(require("path")));
+    const analysisPath = path.join(DATA_ROOT, "data", "analysis.json");
+    if (!fs.existsSync(analysisPath)) {
+        console.log("No session data yet. Run a session to begin.");
+        return;
+    }
+    const analysis = JSON.parse(fs.readFileSync(analysisPath, "utf8"));
+    const { printImproveStats } = await Promise.resolve().then(() => __importStar(require("./improve/improveCli.js")));
+    printImproveStats(DATA_ROOT, analysis);
+}
+async function runImproveTargets() {
+    const fs = await Promise.resolve().then(() => __importStar(require("fs")));
+    const path = await Promise.resolve().then(() => __importStar(require("path")));
+    const analysisPath = path.join(DATA_ROOT, "data", "analysis.json");
+    if (!fs.existsSync(analysisPath)) {
+        console.log("No session data yet. Run a session to begin.");
+        return;
+    }
+    const analysis = JSON.parse(fs.readFileSync(analysisPath, "utf8"));
+    const { printImproveTargets } = await Promise.resolve().then(() => __importStar(require("./improve/improveCli.js")));
+    printImproveTargets(DATA_ROOT, analysis);
+}
+async function runImproveStatus() {
+    const fs = await Promise.resolve().then(() => __importStar(require("fs")));
+    const path = await Promise.resolve().then(() => __importStar(require("path")));
+    const analysisPath = path.join(DATA_ROOT, "data", "analysis.json");
+    if (!fs.existsSync(analysisPath)) {
+        console.log("No session data yet. Run a session to begin.");
+        return;
+    }
+    const analysis = JSON.parse(fs.readFileSync(analysisPath, "utf8"));
+    const { printImproveStatus } = await Promise.resolve().then(() => __importStar(require("./improve/improveCli.js")));
+    printImproveStatus(DATA_ROOT, analysis);
+}
 async function runRollbackList() {
     const { rollbackList } = await Promise.resolve().then(() => __importStar(require("./rollback/rollback.js")));
     console.log(rollbackList(DATA_ROOT));
@@ -158,6 +194,15 @@ async function main() {
                 break;
             case "improve-list":
                 await runImproveList();
+                break;
+            case "improve-stats":
+                await runImproveStats();
+                break;
+            case "improve-targets":
+                await runImproveTargets();
+                break;
+            case "improve-status":
+                await runImproveStatus();
                 break;
             case "rollback-list":
                 await runRollbackList();

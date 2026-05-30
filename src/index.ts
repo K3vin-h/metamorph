@@ -86,6 +86,45 @@ async function runImproveList(): Promise<void> {
   console.log(listImprovements(DATA_ROOT));
 }
 
+async function runImproveStats(): Promise<void> {
+  const fs = await import("fs");
+  const path = await import("path");
+  const analysisPath = path.join(DATA_ROOT, "data", "analysis.json");
+  if (!fs.existsSync(analysisPath)) {
+    console.log("No session data yet. Run a session to begin.");
+    return;
+  }
+  const analysis = JSON.parse(fs.readFileSync(analysisPath, "utf8"));
+  const { printImproveStats } = await import("./improve/improveCli.js");
+  printImproveStats(DATA_ROOT, analysis);
+}
+
+async function runImproveTargets(): Promise<void> {
+  const fs = await import("fs");
+  const path = await import("path");
+  const analysisPath = path.join(DATA_ROOT, "data", "analysis.json");
+  if (!fs.existsSync(analysisPath)) {
+    console.log("No session data yet. Run a session to begin.");
+    return;
+  }
+  const analysis = JSON.parse(fs.readFileSync(analysisPath, "utf8"));
+  const { printImproveTargets } = await import("./improve/improveCli.js");
+  printImproveTargets(DATA_ROOT, analysis);
+}
+
+async function runImproveStatus(): Promise<void> {
+  const fs = await import("fs");
+  const path = await import("path");
+  const analysisPath = path.join(DATA_ROOT, "data", "analysis.json");
+  if (!fs.existsSync(analysisPath)) {
+    console.log("No session data yet. Run a session to begin.");
+    return;
+  }
+  const analysis = JSON.parse(fs.readFileSync(analysisPath, "utf8"));
+  const { printImproveStatus } = await import("./improve/improveCli.js");
+  printImproveStatus(DATA_ROOT, analysis);
+}
+
 async function runRollbackList(): Promise<void> {
   const { rollbackList } = await import("./rollback/rollback.js");
   console.log(rollbackList(DATA_ROOT));
@@ -142,6 +181,15 @@ async function main(): Promise<void> {
         break;
       case "improve-list":
         await runImproveList();
+        break;
+      case "improve-stats":
+        await runImproveStats();
+        break;
+      case "improve-targets":
+        await runImproveTargets();
+        break;
+      case "improve-status":
+        await runImproveStatus();
         break;
       case "rollback-list":
         await runRollbackList();

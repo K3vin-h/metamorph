@@ -2,50 +2,33 @@ import * as fs from "fs";
 import * as path from "path";
 import type { AnalysisResult, AgentProfile } from "../types.js";
 import { loadConfig } from "../config.js";
+import { displayFlag } from "../improve/flagsShort.js";
 
-/** Short flag labels for compact tables (max ~8 chars). */
-function shortFlag(flags: AgentProfile["flags"]): string {
-  if (flags.length === 0) return "—";
-  const f = flags[0];
-  switch (f.type) {
-    case "never-invoked-agent":
-    case "never-applied-skill":
-      return "never";
-    case "rarely-used-agent":
-      return "rare";
-    case "hot-path":
-      return "hot";
-    case "recurring-mistakes":
-      return "mistake";
-    case "unused-tool":
-      return "tool";
-    case "dead-section":
-      return "dead";
-    case "low-confidence-dead-section":
-      return "dead?";
-    default:
-      return "?";
-  }
+const SCORE_MAX = 100;
+
+function escapeCell(value: string): string {
+  return value.replace(/\|/g, "\\|");
 }
 
 function targetTable(title: string, targets: AgentProfile[]): string[] {
   if (targets.length === 0) return [];
 
   const sorted = [...targets].sort((a, b) => a.score - b.score || a.id.localeCompare(b.id));
-  const idW = Math.min(26, Math.max(14, ...sorted.map((t) => t.id.length)));
 
   const lines = [
     `## ${title} (${sorted.length})`,
     "",
-    "```",
-    `${"id".padEnd(idW)}  sc  flag`,
+    "| id | score | flag |",
+    "| --- | ---: | :--- |",
   ];
 
   for (const t of sorted) {
-    lines.push(`${t.id.padEnd(idW)}  ${String(t.score).padStart(2)}  ${shortFlag(t.flags)}`);
+    lines.push(
+      `| ${escapeCell(t.id)} | ${t.score}/${SCORE_MAX} | ${escapeCell(displayFlag(t.flags))} |`
+    );
   }
 
-  lines.push("```", "");
+  lines.push("");
   return lines;
 }
 
@@ -70,7 +53,7 @@ export function generateReportMd(pluginRoot: string, analysis: AnalysisResult): 
     lines.push(langEntries.map(([l, p]) => `${l} ${(p * 100).toFixed(0)}%`).join(" · "));
   }
 
-  lines.push("", "_sc = score 0–100 · flag: — ok · never · rare · hot · tool · dead · mistake_", "");
+  lines.push("", "_flag: — ok · never · rare · hot · tool · dead · mistake_", "");
 
   lines.push(...targetTable("Agents", agents));
   lines.push(...targetTable("Skills", skills));

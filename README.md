@@ -1,6 +1,6 @@
 # metamorph
 
-**Version 1.0.5**
+**Version 1.0.6**
 
 metamorph is a Claude Code plugin that watches how you actually work — which agents you call, which skills you load, and what kinds of files you touch — then suggests small improvements to your agent and skill files so they better match your real habits.
 
@@ -208,13 +208,13 @@ Feedback is limited to 500 characters per entry.
 
 When you run `/metamorph` with no flags:
 
-1. Loads your data from past sessions (`analysis.json`).
-2. Shows a short summary — session count, tool usage, warm-up status.
-3. Lists agents, skills, and CLAUDE.md targets with their scores.
-4. Asks which targets you want to improve.
-5. Generates diffs in parallel (one per target you picked).
-6. Shows every diff for you to read.
-7. Asks what to accept — `all`, specific IDs, or `none`.
+1. Runs fast CLI helpers (`improve-stats`, `improve-targets`) — the orchestrator does **not** load `analysis.json` into chat.
+2. Shows session summary and target tables, then asks what to improve.
+3. Runs `prepare-improve-batch` once (shared `runId`) to build tiny per-target context files (~1–3 KB each, not full agent bodies).
+4. Dispatches **`metamorph-diff` subagents in parallel** (`haiku`) — each reads only its context JSON path.
+5. Shows diffs and asks what to accept — `all`, specific IDs, or `none`.
+
+**Speed / token tips:** use `top 3` instead of `all`; default cap is `maxSuggestionsPerRun` (3). Never-invoked targets only send frontmatter + intro, not the full file.
 
 Suggested changes follow strict rules:
 
@@ -255,7 +255,7 @@ Turn tracking off with `/metamorph-config set read.mistakeTracking=false`.
 
 Targets with repeated mistakes get a `recurring mistakes` flag on the dashboard.
 
-**Token usage (same as other features):** mistake data is aggregated in `analysis.json`, then only a **compact** `mistakes` slice (max 3 patterns, 2 examples, 80 chars each) is written to improve-context files — like `flags`, `feedback`, and `flaggedSections`. No extra LLM reads of raw transcripts.
+**Token usage (same as other features):** mistake data is aggregated in `analysis.json`, then only a **compact** `mistakes` slice (max 3 patterns, 2 examples, 80 chars each) is written to improve-context JSON files. Context files omit full flag lists, language stats, and duplicate section bodies. No extra LLM reads of raw transcripts or target files on disk.
 
 ---
 
