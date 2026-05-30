@@ -8,6 +8,7 @@ export interface Config {
   read: {
     scope: "global" | "project" | "both";
     transcripts: PrivacyMode;
+    mistakeTracking: boolean;
     denyGlobs: string[];
   };
   write: {
@@ -79,6 +80,34 @@ export interface SessionProfile {
   skillApplied: Record<string, number>;
   fileExtensions: Record<string, number>;
   skippedLines: number;
+  mistakeEvents?: MistakeEvent[];
+}
+
+export type MistakeKind =
+  | "user-rejection"
+  | "user-correction"
+  | "command-failure"
+  | "suggestion-rejected";
+
+export interface MistakeEvent {
+  sessionId: string;
+  timestamp: string;
+  targetKind: "agent" | "skill" | "main";
+  targetId: string;
+  /** Tool that completed before the user fix message (all tool types). */
+  toolName: string;
+  kind: MistakeKind;
+  mistakeSummary: string;
+  correctionSummary?: string;
+  confidence: "high" | "low";
+}
+
+export interface MistakePattern {
+  kind: MistakeKind;
+  /** Tool name grouped (Bash, Edit, Read, Agent, Skill, MCP tools, etc.). */
+  tool: string;
+  count: number;
+  examples: Array<{ mistake: string; correction?: string }>;
 }
 
 export type FlagType =
@@ -88,6 +117,7 @@ export type FlagType =
   | "never-applied-skill"
   | "never-invoked-agent"
   | "rarely-used-agent"
+  | "recurring-mistakes"
   | "hot-path";
 
 export interface Flag {
@@ -106,6 +136,7 @@ export interface AgentProfile {
   usedTools: string[];
   flags: Flag[];
   flaggedSectionText?: Record<string, string>;
+  mistakePatterns?: MistakePattern[];
 }
 
 export interface AnalysisTotals {

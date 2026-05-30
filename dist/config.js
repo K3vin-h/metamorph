@@ -49,6 +49,7 @@ const DEFAULTS = {
     read: {
         scope: "both",
         transcripts: "redacted",
+        mistakeTracking: true,
         denyGlobs: ["projects/**/secrets*", "**/*.env*", "**/.env", "**/credentials*"],
     },
     write: {
@@ -126,6 +127,9 @@ function mergeWithDefaults(raw) {
         read: {
             scope: (read.scope === "global" || read.scope === "project" || read.scope === "both") ? read.scope : DEFAULTS.read.scope,
             transcripts: isValidPrivacyMode(read.transcripts) ? read.transcripts : DEFAULTS.read.transcripts,
+            mistakeTracking: typeof read.mistakeTracking === "boolean"
+                ? read.mistakeTracking
+                : DEFAULTS.read.mistakeTracking,
             denyGlobs: Array.isArray(read.denyGlobs) ? read.denyGlobs.filter((g) => typeof g === "string") : DEFAULTS.read.denyGlobs,
         },
         write: {

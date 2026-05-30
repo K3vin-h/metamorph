@@ -39,7 +39,7 @@ function computeSectionScore(sections, _rawContent, usedTools) {
     return { score, deadSections };
 }
 function scoreTarget(data, totals, config, kind) {
-    const { id, path, invocations, declaredTools, usedTools, sections, rawContent, loads, applied } = data;
+    const { id, path, invocations, declaredTools, usedTools, sections, rawContent, loads, applied, mistakePatterns } = data;
     const readMode = config.read.transcripts;
     // Invocation score (40%)
     const totalRuns = kind === "agent" ? Math.max(1, totals.agentRuns) : Math.max(1, totals.skillLoads);
@@ -83,6 +83,10 @@ function scoreTarget(data, totals, config, kind) {
     }
     if (kind === "skill" && loads > 0 && applied === 0) {
         flags.push({ type: "never-applied-skill", confidence: "high" });
+    }
+    const mistakeCount = (mistakePatterns ?? []).reduce((s, p) => s + p.count, 0);
+    if (mistakeCount >= 2) {
+        flags.push({ type: "recurring-mistakes", confidence: mistakeCount >= 4 ? "high" : "low" });
     }
     // Build flagged section text (only for flagged sections, to keep analysis.json compact)
     const flaggedSectionText = {};

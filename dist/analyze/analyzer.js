@@ -41,6 +41,7 @@ const historyParser_js_1 = require("../capture/historyParser.js");
 const config_js_1 = require("../config.js");
 const feedback_js_1 = require("../feedback.js");
 const scorer_js_1 = require("../score/scorer.js");
+const mistakeAggregator_js_1 = require("./mistakeAggregator.js");
 const sessionCounter_js_1 = require("../capture/sessionCounter.js");
 const utils_js_1 = require("../utils.js");
 const hookErrors_js_1 = require("../hookErrors.js");
@@ -211,13 +212,39 @@ async function runAnalysis(pluginRoot, claudeRoot) {
     const agents = agentDefs.map((def) => {
         const invocations = agg.agentInvocations[def.id] ?? 0;
         const usedTools = [...(agg.agentUsedTools[def.id] ?? new Set())];
-        return (0, scorer_js_1.scoreTarget)({ id: def.id, path: def.relativePath, invocations, declaredTools: def.declaredTools, usedTools, sections: def.sections, rawContent: def.rawContent, loads: 0, applied: 0 }, totals, config, "agent");
+        const mistakePatterns = (0, mistakeAggregator_js_1.aggregateMistakePatterns)(cache.sessions, pluginRoot, def.id, "agent");
+        const profile = (0, scorer_js_1.scoreTarget)({
+            id: def.id,
+            path: def.relativePath,
+            invocations,
+            declaredTools: def.declaredTools,
+            usedTools,
+            sections: def.sections,
+            rawContent: def.rawContent,
+            loads: 0,
+            applied: 0,
+            mistakePatterns,
+        }, totals, config, "agent");
+        return mistakePatterns.length > 0 ? { ...profile, mistakePatterns } : profile;
     });
     const skillDefs = loadDefinitionFiles(claudeRoot, "skills", pluginRoot);
     const skills = skillDefs.map((def) => {
         const loads = agg.skillLoads[def.id] ?? 0;
         const applied = agg.skillApplied[def.id] ?? 0;
-        return (0, scorer_js_1.scoreTarget)({ id: def.id, path: def.relativePath, invocations: loads, declaredTools: def.declaredTools, usedTools: [], sections: def.sections, rawContent: def.rawContent, loads, applied }, totals, config, "skill");
+        const mistakePatterns = (0, mistakeAggregator_js_1.aggregateMistakePatterns)(cache.sessions, pluginRoot, def.id, "skill");
+        const profile = (0, scorer_js_1.scoreTarget)({
+            id: def.id,
+            path: def.relativePath,
+            invocations: loads,
+            declaredTools: def.declaredTools,
+            usedTools: [],
+            sections: def.sections,
+            rawContent: def.rawContent,
+            loads,
+            applied,
+            mistakePatterns,
+        }, totals, config, "skill");
+        return mistakePatterns.length > 0 ? { ...profile, mistakePatterns } : profile;
     });
     const result = {
         generatedAt: new Date().toISOString(),

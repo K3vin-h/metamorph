@@ -37,7 +37,10 @@ exports.parseTranscript = parseTranscript;
 const fs = __importStar(require("fs"));
 const readline = __importStar(require("readline"));
 const privacy_js_1 = require("../privacy.js");
-async function parseTranscript(transcriptPath, sessionId, mode, denyGlobs, claudeRoot) {
+const transcriptLine_js_1 = require("./transcriptLine.js");
+const mistakeParser_js_1 = require("./mistakeParser.js");
+const config_js_1 = require("../config.js");
+async function parseTranscript(transcriptPath, sessionId, mode, denyGlobs, claudeRoot, pluginRoot) {
     const profile = {
         sessionId,
         capturedAt: new Date().toISOString(),
@@ -49,9 +52,12 @@ async function parseTranscript(transcriptPath, sessionId, mode, denyGlobs, claud
         skillApplied: {},
         fileExtensions: {},
         skippedLines: 0,
+        mistakeEvents: [],
     };
     if (!fs.existsSync(transcriptPath))
         return profile;
+    const config = pluginRoot ? (0, config_js_1.loadConfig)(pluginRoot) : null;
+    const mistakeTracking = config?.read.mistakeTracking !== false && mode !== "off";
     const stream = fs.createReadStream(transcriptPath, "utf8");
     const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
     for await (const line of rl) {
@@ -65,36 +71,44 @@ async function parseTranscript(transcriptPath, sessionId, mode, denyGlobs, claud
             profile.skippedLines++;
             continue;
         }
-        // Record agent call ID → agent type mapping for subagent transcript cross-reference
-        if (raw.role === "assistant" && Array.isArray(raw.content)) {
-            for (const block of raw.content) {
-                if (block.type === "tool_use" && block.name === "Agent" && block.id) {
-                    const agentType = block.input?.subagent_type;
+        const normalized = (0, transcriptLine_js_1.normalizeTranscriptLine)(raw);
+        if (!normalized)
+            continue;
+        if (normalized.lineType === "assistant" || normalized.role === "assistant") {
+            for (const block of (0, transcriptLine_js_1.contentBlocks)(normalized.content)) {
+                if (block.type === "tool_use" && block.name === "Agent" && typeof block.id === "string") {
+                    const input = (block.input ?? {});
+                    const agentType = input.subagent_type;
                     if (typeof agentType === "string") {
                         profile.agentCallMappings[block.id] = agentType;
                     }
                 }
             }
+            const legacyLine = {
+                type: "assistant",
+                role: "assistant",
+                content: normalized.content,
+                sessionId,
+                timestamp: normalized.timestamp,
+            };
+            const events = (0, privacy_js_1.filterTranscriptEvent)(legacyLine, sessionId, mode, denyGlobs, claudeRoot);
+            for (const ev of events) {
+                profile.toolCalls.push(ev);
+                if (ev.agentId) {
+                    profile.agentInvocations[ev.agentId] = (profile.agentInvocations[ev.agentId] ?? 0) + 1;
+                }
+                if (ev.skillId) {
+                    profile.skillLoads[ev.skillId] = (profile.skillLoads[ev.skillId] ?? 0) + 1;
+                    profile.skillApplied[ev.skillId] = profile.skillApplied[ev.skillId] ?? 0;
+                }
+                for (const ext of ev.fileExtensions ?? []) {
+                    profile.fileExtensions[ext] = (profile.fileExtensions[ext] ?? 0) + 1;
+                }
+            }
         }
-        const events = (0, privacy_js_1.filterTranscriptEvent)(raw, sessionId, mode, denyGlobs, claudeRoot);
-        for (const ev of events) {
-            profile.toolCalls.push(ev);
-            // Track agent invocations
-            if (ev.agentId) {
-                profile.agentInvocations[ev.agentId] = (profile.agentInvocations[ev.agentId] ?? 0) + 1;
-            }
-            // Track skill loads only — skillApplied comes from historyParser where entry.type === "apply"
-            // gives a reliable signal. Unconditionally incrementing applied here would make applied/loads
-            // always 1.0, defeating the never-applied-skill flag.
-            if (ev.skillId) {
-                profile.skillLoads[ev.skillId] = (profile.skillLoads[ev.skillId] ?? 0) + 1;
-                profile.skillApplied[ev.skillId] = profile.skillApplied[ev.skillId] ?? 0;
-            }
-            // Track file extensions
-            for (const ext of ev.fileExtensions ?? []) {
-                profile.fileExtensions[ext] = (profile.fileExtensions[ext] ?? 0) + 1;
-            }
-        }
+    }
+    if (mistakeTracking && pluginRoot) {
+        profile.mistakeEvents = await (0, mistakeParser_js_1.parseMistakesFromTranscript)(transcriptPath, sessionId, mode, denyGlobs, claudeRoot, true);
     }
     return profile;
 }

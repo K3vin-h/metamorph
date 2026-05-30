@@ -62,7 +62,7 @@ export async function sessionStart(pluginRoot: string, _claudeRoot: string): Pro
     }
   }
 
-  lines.push(`  dashboard: ${path.join(pluginRoot, "report.html")}`);
+  lines.push(`  report: ${path.join(pluginRoot, "report.md")}`);
   lines.push("─".repeat(50));
 
   console.log(lines.join("\n"));

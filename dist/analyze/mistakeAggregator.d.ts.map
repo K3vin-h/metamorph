@@ -1,0 +1,1 @@
+{"version":3,"file":"mistakeAggregator.d.ts","sourceRoot":"","sources":["../../src/analyze/mistakeAggregator.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAgB,cAAc,EAAE,cAAc,EAAE,MAAM,aAAa,CAAC;AA2BhF,wBAAgB,wBAAwB,CACtC,QAAQ,EAAE,MAAM,CAAC,MAAM,EAAE,cAAc,CAAC,EACxC,UAAU,EAAE,MAAM,EAClB,QAAQ,EAAE,MAAM,EAChB,UAAU,EAAE,OAAO,GAAG,OAAO,GAC5B,cAAc,EAAE,CA8ClB"}

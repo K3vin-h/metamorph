@@ -118,7 +118,7 @@ async function updateCache(pluginRoot, claudeRoot, currentSessionId) {
         if (cache.sessions[sessionId] || cache.failedSessions[sessionId])
             continue;
         try {
-            const profile = await (0, transcriptParser_js_1.parseTranscript)(filePath, sessionId, config.read.transcripts, config.read.denyGlobs, claudeRoot);
+            const profile = await (0, transcriptParser_js_1.parseTranscript)(filePath, sessionId, config.read.transcripts, config.read.denyGlobs, claudeRoot, pluginRoot);
             cache.sessions[sessionId] = profile;
         }
         catch (err) {
@@ -147,7 +147,7 @@ async function updateCache(pluginRoot, claudeRoot, currentSessionId) {
                 if (cache.sessions[subSessionId] || cache.failedSessions[subSessionId])
                     continue;
                 try {
-                    const profile = await (0, transcriptParser_js_1.parseTranscript)(path.join(subagentDir, file), subSessionId, config.read.transcripts, config.read.denyGlobs, claudeRoot);
+                    const profile = await (0, transcriptParser_js_1.parseTranscript)(path.join(subagentDir, file), subSessionId, config.read.transcripts, config.read.denyGlobs, claudeRoot, pluginRoot);
                     const agentType = callIdToAgentType[callId];
                     if (agentType) {
                         for (const ev of profile.toolCalls) {
@@ -163,8 +163,21 @@ async function updateCache(pluginRoot, claudeRoot, currentSessionId) {
             }
         }
     }
+    if (config.read.mistakeTracking && config.read.transcripts !== "off") {
+        await backfillMistakeEvents(pluginRoot, claudeRoot, cache, config.read.transcripts, config.read.denyGlobs);
+    }
     writeCache(pluginRoot, cache);
     return cache;
+}
+async function backfillMistakeEvents(pluginRoot, claudeRoot, cache, mode, denyGlobs) {
+    const { parseMistakesFromTranscript } = await Promise.resolve().then(() => __importStar(require("./mistakeParser.js")));
+    for (const { sessionId, filePath } of findTranscriptFiles(claudeRoot, pluginRoot)) {
+        const existing = cache.sessions[sessionId];
+        if (!existing)
+            continue;
+        const { collectSessionMistakeEvents } = await Promise.resolve().then(() => __importStar(require("./mistakeParser.js")));
+        existing.mistakeEvents = await collectSessionMistakeEvents(filePath, sessionId, mode, denyGlobs, claudeRoot);
+    }
 }
 function readProfileCache(pluginRoot) {
     return readCache(pluginRoot);

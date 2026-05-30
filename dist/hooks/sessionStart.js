@@ -87,7 +87,7 @@ async function sessionStart(pluginRoot, _claudeRoot) {
             lines.push(`    ${t.id} (score ${t.score}) — ${flag.type} [${flag.confidence}]`);
         }
     }
-    lines.push(`  dashboard: ${path.join(pluginRoot, "report.html")}`);
+    lines.push(`  report: ${path.join(pluginRoot, "report.md")}`);
     lines.push("─".repeat(50));
     console.log(lines.join("\n"));
 }

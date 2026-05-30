@@ -1,4 +1,4 @@
-import type { AgentProfile, AnalysisTotals, Config, Flag, FlagType } from "../types.js";
+import type { AgentProfile, AnalysisTotals, Config, Flag, FlagType, MistakePattern } from "../types.js";
 import { scrubSecrets } from "../security.js";
 
 interface TargetData {
@@ -11,6 +11,7 @@ interface TargetData {
   rawContent: string;
   loads: number;
   applied: number;
+  mistakePatterns?: MistakePattern[];
 }
 
 // Keywords that suggest a section's content is being exercised
@@ -64,7 +65,7 @@ export function scoreTarget(
   config: Config,
   kind: "agent" | "skill"
 ): AgentProfile {
-  const { id, path, invocations, declaredTools, usedTools, sections, rawContent, loads, applied } = data;
+  const { id, path, invocations, declaredTools, usedTools, sections, rawContent, loads, applied, mistakePatterns } = data;
   const readMode = config.read.transcripts;
 
   // Invocation score (40%)
@@ -124,6 +125,11 @@ export function scoreTarget(
 
   if (kind === "skill" && loads > 0 && applied === 0) {
     flags.push({ type: "never-applied-skill", confidence: "high" });
+  }
+
+  const mistakeCount = (mistakePatterns ?? []).reduce((s, p) => s + p.count, 0);
+  if (mistakeCount >= 2) {
+    flags.push({ type: "recurring-mistakes", confidence: mistakeCount >= 4 ? "high" : "low" });
   }
 
   // Build flagged section text (only for flagged sections, to keep analysis.json compact)

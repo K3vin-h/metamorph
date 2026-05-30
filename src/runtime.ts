@@ -74,6 +74,5 @@ export function ensurePersistentData(pluginRoot: string, dataRoot: string): void
     copyPathIfMissing(path.join(candidate, "suggestions"), path.join(dataRoot, "suggestions"));
     copyPathIfMissing(path.join(candidate, "backups"), path.join(dataRoot, "backups"));
     copyPathIfMissing(path.join(candidate, "report.md"), path.join(dataRoot, "report.md"));
-    copyPathIfMissing(path.join(candidate, "report.html"), path.join(dataRoot, "report.html"));
   }
 }

@@ -110,7 +110,8 @@ export async function updateCache(
         sessionId,
         config.read.transcripts,
         config.read.denyGlobs,
-        claudeRoot
+        claudeRoot,
+        pluginRoot
       );
       cache.sessions[sessionId] = profile;
     } catch (err) {
@@ -142,7 +143,8 @@ export async function updateCache(
             subSessionId,
             config.read.transcripts,
             config.read.denyGlobs,
-            claudeRoot
+            claudeRoot,
+            pluginRoot
           );
           const agentType = callIdToAgentType[callId];
           if (agentType) {
@@ -159,8 +161,36 @@ export async function updateCache(
     }
   }
 
+  if (config.read.mistakeTracking && config.read.transcripts !== "off") {
+    await backfillMistakeEvents(pluginRoot, claudeRoot, cache, config.read.transcripts, config.read.denyGlobs);
+  }
+
   writeCache(pluginRoot, cache);
   return cache;
+}
+
+async function backfillMistakeEvents(
+  pluginRoot: string,
+  claudeRoot: string,
+  cache: ProfileCache,
+  mode: import("../types.js").PrivacyMode,
+  denyGlobs: string[]
+): Promise<void> {
+  const { parseMistakesFromTranscript } = await import("./mistakeParser.js");
+
+  for (const { sessionId, filePath } of findTranscriptFiles(claudeRoot, pluginRoot)) {
+    const existing = cache.sessions[sessionId];
+    if (!existing) continue;
+
+    const { collectSessionMistakeEvents } = await import("./mistakeParser.js");
+    existing.mistakeEvents = await collectSessionMistakeEvents(
+      filePath,
+      sessionId,
+      mode,
+      denyGlobs,
+      claudeRoot
+    );
+  }
 }
 
 export function readProfileCache(pluginRoot: string): ProfileCache {

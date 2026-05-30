@@ -6,6 +6,7 @@ import { parseHistory } from "../capture/historyParser.js";
 import { loadConfig } from "../config.js";
 import { readFeedbackEntries } from "../feedback.js";
 import { scoreTarget } from "../score/scorer.js";
+import { aggregateMistakePatterns } from "./mistakeAggregator.js";
 import { getCount } from "../capture/sessionCounter.js";
 import { parseFrontmatter } from "../utils.js";
 import { logHookError } from "../hookErrors.js";
@@ -214,24 +215,50 @@ export async function runAnalysis(pluginRoot: string, claudeRoot: string): Promi
   const agents = agentDefs.map((def) => {
     const invocations = agg.agentInvocations[def.id] ?? 0;
     const usedTools = [...(agg.agentUsedTools[def.id] ?? new Set())];
-    return scoreTarget(
-      { id: def.id, path: def.relativePath, invocations, declaredTools: def.declaredTools, usedTools, sections: def.sections, rawContent: def.rawContent, loads: 0, applied: 0 },
+    const mistakePatterns = aggregateMistakePatterns(cache.sessions, pluginRoot, def.id, "agent");
+    const profile = scoreTarget(
+      {
+        id: def.id,
+        path: def.relativePath,
+        invocations,
+        declaredTools: def.declaredTools,
+        usedTools,
+        sections: def.sections,
+        rawContent: def.rawContent,
+        loads: 0,
+        applied: 0,
+        mistakePatterns,
+      },
       totals,
       config,
       "agent"
     );
+    return mistakePatterns.length > 0 ? { ...profile, mistakePatterns } : profile;
   });
 
   const skillDefs = loadDefinitionFiles(claudeRoot, "skills", pluginRoot);
   const skills = skillDefs.map((def) => {
     const loads = agg.skillLoads[def.id] ?? 0;
     const applied = agg.skillApplied[def.id] ?? 0;
-    return scoreTarget(
-      { id: def.id, path: def.relativePath, invocations: loads, declaredTools: def.declaredTools, usedTools: [], sections: def.sections, rawContent: def.rawContent, loads, applied },
+    const mistakePatterns = aggregateMistakePatterns(cache.sessions, pluginRoot, def.id, "skill");
+    const profile = scoreTarget(
+      {
+        id: def.id,
+        path: def.relativePath,
+        invocations: loads,
+        declaredTools: def.declaredTools,
+        usedTools: [],
+        sections: def.sections,
+        rawContent: def.rawContent,
+        loads,
+        applied,
+        mistakePatterns,
+      },
       totals,
       config,
       "skill"
     );
+    return mistakePatterns.length > 0 ? { ...profile, mistakePatterns } : profile;
   });
 
   const result: AnalysisResult = {

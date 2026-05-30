@@ -1,4 +1,4 @@
-import type { AgentProfile, AnalysisTotals, Config } from "../types.js";
+import type { AgentProfile, AnalysisTotals, Config, MistakePattern } from "../types.js";
 interface TargetData {
     id: string;
     path: string;
@@ -9,6 +9,7 @@ interface TargetData {
     rawContent: string;
     loads: number;
     applied: number;
+    mistakePatterns?: MistakePattern[];
 }
 export declare function scoreTarget(data: TargetData, totals: AnalysisTotals, config: Config, kind: "agent" | "skill"): AgentProfile;
 export {};

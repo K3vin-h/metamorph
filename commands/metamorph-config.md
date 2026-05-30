@@ -26,6 +26,7 @@ View or update individual config settings.
 | `maxSuggestionsPerRun` | integer 1–20 | Max targets per /metamorph run |
 | `read.scope` | global/project/both | Which directories to analyze |
 | `read.transcripts` | full/redacted/off | Transcript privacy level |
+| `read.mistakeTracking` | true/false | Track mistakes and corrections from sessions |
 | `write.targets.agents` | true/false | Allow editing agent files |
 | `write.targets.skills` | true/false | Allow editing skill files |
 | `write.targets.claudeMd` | true/false | Allow editing CLAUDE.md |

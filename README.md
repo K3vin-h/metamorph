@@ -1,6 +1,6 @@
 # metamorph
 
-**Version 1.0.4**
+**Version 1.0.5**
 
 metamorph is a Claude Code plugin that watches how you actually work — which agents you call, which skills you load, and what kinds of files you touch — then suggests small improvements to your agent and skill files so they better match your real habits.
 
@@ -23,7 +23,7 @@ metamorph is a Claude Code plugin that watches how you actually work — which a
 1. **Watches** your Claude Code sessions in the background. This part does not use AI tokens.
 2. **Scores** each agent and skill from 0–100. Lower scores mean more room to improve.
 3. **Flags** problems like never-used agents, unused tools, or sections that do not match your workflow.
-4. **Shows** a habits dashboard (`report.md` and `report.html`) after every session.
+4. **Shows** a compact habits dashboard (`report.md`) after every session.
 5. **Suggests** small, targeted edits — then waits for your approval before writing anything.
 6. **Backs up** every file it changes so you can undo with one command.
 
@@ -151,6 +151,7 @@ When picking targets in `/metamorph`, you can type specific IDs, `top 3`, `top N
 | `maxSuggestionsPerRun` | 1–20 | Stored config limit (default: 3) |
 | `read.scope` | `global` / `project` / `both` | Which config folders to analyze |
 | `read.transcripts` | `full` / `redacted` / `off` | How much transcript data to store |
+| `read.mistakeTracking` | `true` / `false` | Track mistakes and corrections from sessions |
 | `write.targets.agents` | `true` / `false` | Allow editing agent files |
 | `write.targets.skills` | `true` / `false` | Allow editing skill files |
 | `write.targets.claudeMd` | `false` / `global` / `local` / `both` | Which CLAUDE.md files may be edited |
@@ -227,6 +228,37 @@ Session data in diff context is wrapped in `[UNTRUSTED DATA]` blocks — the AI 
 
 ---
 
+## Mistake and correction tracking
+
+metamorph watches sessions for signals that an agent or skill output was wrong and how you corrected it. This data is used when you run `/metamorph` to suggest better guardrails in agent and skill files.
+
+**What gets detected (heuristic — not perfect):**
+
+| Signal | When it counts |
+|--------|----------------|
+| **Fix after completed tool** | A tool runs and **completes successfully** (not rejected, not errored), then you send a **text message** asking to fix or correct the output |
+| **Rejected suggestion** | You run `/metamorph-improve --reject` on a pending metamorph diff |
+
+**What does NOT count:** declined tool uses, failed commands, or generic complaints with no prior completed tool in the same flow.
+
+Applies to **every tool type** (Bash, Read, Edit, Write, Grep, Agent, Skill, MCP tools, etc.) and **subagent** transcripts. Each event records which tool completed and which agent/skill was active. Summaries are scrubbed and capped at 80 characters.
+
+**Privacy:**
+
+| Transcript mode | Mistake tracking |
+|-----------------|------------------|
+| `redacted` (default) | Pattern labels only — no quotes from your messages |
+| `full` | Short scrubbed excerpts from your messages |
+| `off` | Disabled (only logged rejections from `/metamorph-improve --reject`) |
+
+Turn tracking off with `/metamorph-config set read.mistakeTracking=false`.
+
+Targets with repeated mistakes get a `recurring mistakes` flag on the dashboard.
+
+**Token usage (same as other features):** mistake data is aggregated in `analysis.json`, then only a **compact** `mistakes` slice (max 3 patterns, 2 examples, 80 chars each) is written to improve-context files — like `flags`, `feedback`, and `flaggedSections`. No extra LLM reads of raw transcripts.
+
+---
+
 ## Understanding scores and flags
 
 Each agent and skill gets a **score from 0 to 100**. Lower scores mean metamorph thinks there is more room to improve. The score combines:
@@ -249,6 +281,7 @@ Common **flags** you may see on the dashboard:
 | `dead-section` | A documentation section may not match your workflow (high confidence in `full` privacy mode) |
 | `low-confidence-dead-section` | Same idea, but less certain (in `redacted` or `off` mode) |
 | `never-applied` | Skill was loaded but never actually applied |
+| `recurring-mistakes` | Multiple mistake/correction signals linked to this target |
 
 The dashboard also shows a **language breakdown** (e.g. `ts:60%, py:30%`) based on file types you worked with.
 
@@ -271,14 +304,7 @@ If something goes wrong in a hook, check `data/hook-errors.log` in your plugin d
 
 ## Dashboard and reports
 
-After every session, metamorph updates:
-
-| File | How to view | What it shows |
-|------|-------------|---------------|
-| `report.md` | `/metamorph-report` | Compact text dashboard grouped by flag type |
-| `report.html` | Open in a browser | Charts, flagged targets, copy-paste command buttons, feedback section |
-
-Both files live in your plugin data folder. The HTML dashboard includes buttons that copy slash commands (like `/metamorph --target architect`) you can paste into Claude Code.
+After every session, metamorph updates `report.md` in your plugin data folder. View it with `/metamorph-report` or open the file directly. It lists agents and skills in compact tables (score + short flag) and links to `/metamorph` when warm-up is complete.
 
 ---
 
@@ -304,8 +330,8 @@ Usually:
 | `data/feedback.log` | Your logged feedback |
 | `data/style-profile.json` | Your writing style patterns (used to match suggested edits) |
 | `data/hook-errors.log` | Error log if background hooks fail |
-| `report.md` | Text dashboard |
-| `report.html` | Interactive dashboard |
+| `data/mistake-feedback.jsonl` | Logged suggestion rejections and similar feedback |
+| `report.md` | Compact text dashboard |
 | `suggestions/` | Pending diff files waiting for approval |
 | `backups/` | Previous versions of metamorph-edited files |
 | `backups/manifest.json` | Rollback tracking with checksums |

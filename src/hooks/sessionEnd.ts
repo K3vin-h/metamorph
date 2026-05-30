@@ -61,11 +61,6 @@ export async function sessionEnd(pluginRoot: string, claudeRoot: string): Promis
       const { generateReportMd } = await import("../report/reportMd.js");
       generateReportMd(pluginRoot, currentAnalysis);
     }, failures);
-
-    await runStage(pluginRoot, "generateReportHtml", async () => {
-      const { generateReportHtml } = await import("../report/reportHtml.js");
-      generateReportHtml(pluginRoot, currentAnalysis);
-    }, failures);
   }
 
   const { loadConfig } = await import("../config.js");

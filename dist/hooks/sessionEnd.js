@@ -84,10 +84,6 @@ async function sessionEnd(pluginRoot, claudeRoot) {
             const { generateReportMd } = await Promise.resolve().then(() => __importStar(require("../report/reportMd.js")));
             generateReportMd(pluginRoot, currentAnalysis);
         }, failures);
-        await runStage(pluginRoot, "generateReportHtml", async () => {
-            const { generateReportHtml } = await Promise.resolve().then(() => __importStar(require("../report/reportHtml.js")));
-            generateReportHtml(pluginRoot, currentAnalysis);
-        }, failures);
     }
     const { loadConfig } = await Promise.resolve().then(() => __importStar(require("../config.js")));
     const config = loadConfig(pluginRoot);
