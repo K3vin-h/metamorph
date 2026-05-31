@@ -46,6 +46,13 @@ function refreshReportFromDisk(pluginRoot) {
     if (!fs.existsSync(analysisPath))
         return false;
     try {
+        const reportPath = path.join(pluginRoot, "report.md");
+        if (fs.existsSync(reportPath)) {
+            const analysisMtime = fs.statSync(analysisPath).mtimeMs;
+            const reportMtime = fs.statSync(reportPath).mtimeMs;
+            if (reportMtime >= analysisMtime)
+                return true;
+        }
         const analysis = JSON.parse(fs.readFileSync(analysisPath, "utf8"));
         if (typeof analysis.sessionCount !== "number" || !Array.isArray(analysis.agents)) {
             return false;
