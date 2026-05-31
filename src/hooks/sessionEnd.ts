@@ -29,9 +29,10 @@ export async function sessionEnd(pluginRoot: string, claudeRoot: string): Promis
   const sessionId = process.env.CLAUDE_SESSION_ID ?? `session-${Date.now()}`;
   const failures: string[] = [];
 
+  let newSessions = 0;
   await runStage(pluginRoot, "updateCache", async () => {
     const { updateCache } = await import("../capture/incrementalCache.js");
-    await updateCache(pluginRoot, claudeRoot, sessionId);
+    newSessions = await updateCache(pluginRoot, claudeRoot, sessionId);
   }, failures);
 
   let count = 0;
@@ -41,10 +42,12 @@ export async function sessionEnd(pluginRoot: string, claudeRoot: string): Promis
   }, failures);
 
   let analysis: AnalysisResult | null = null;
-  await runStage(pluginRoot, "runAnalysis", async () => {
-    const { runAnalysis } = await import("../analyze/analyzer.js");
-    analysis = await runAnalysis(pluginRoot, claudeRoot);
-  }, failures);
+  if (newSessions > 0) {
+    await runStage(pluginRoot, "runAnalysis", async () => {
+      const { runAnalysis } = await import("../analyze/analyzer.js");
+      analysis = await runAnalysis(pluginRoot, claudeRoot);
+    }, failures);
+  }
 
   if (!analysis) {
     analysis = loadAnalysisFromDisk(pluginRoot);
@@ -52,15 +55,16 @@ export async function sessionEnd(pluginRoot: string, claudeRoot: string): Promis
 
   if (analysis) {
     const currentAnalysis = analysis;
-    await runStage(pluginRoot, "deriveStyleProfile", async () => {
-      const { deriveStyleProfile } = await import("../style.js");
-      await deriveStyleProfile(pluginRoot, claudeRoot, currentAnalysis);
-    }, failures);
-
-    await runStage(pluginRoot, "generateReportMd", async () => {
-      const { generateReportMd } = await import("../report/reportMd.js");
-      generateReportMd(pluginRoot, currentAnalysis);
-    }, failures);
+    await Promise.all([
+      runStage(pluginRoot, "deriveStyleProfile", async () => {
+        const { deriveStyleProfile } = await import("../style.js");
+        await deriveStyleProfile(pluginRoot, claudeRoot, currentAnalysis);
+      }, failures),
+      runStage(pluginRoot, "generateReportMd", async () => {
+        const { generateReportMd } = await import("../report/reportMd.js");
+        generateReportMd(pluginRoot, currentAnalysis);
+      }, failures),
+    ]);
   }
 
   const { loadConfig } = await import("../config.js");

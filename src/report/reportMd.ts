@@ -44,15 +44,21 @@ export function generateReportMd(pluginRoot: string, analysis: AnalysisResult): 
     lines.push(langEntries.map(([l, p]) => `${l} ${(p * 100).toFixed(0)}%`).join(" · "));
   }
 
-  lines.push("", "_flag: — ok · never · rare · hot · tool · dead · mistake_", "");
+  lines.push(
+    "",
+    "_Score: 0–30 needs attention · 31–70 moderate · 71–100 healthy_",
+    "_Flags: never=not used · rare=low usage · hot=high demand · tool=unused declared tool · dead=inactive section · mistake=recurring correction patterns_",
+    ""
+  );
 
   lines.push(...formatAsciiTargetTable("Agents", agents));
   lines.push(...formatAsciiTargetTable("Skills", skills));
 
+  const remaining = config.warmupSessions - sessionCount;
   lines.push(
     warmupMet
-      ? "/metamorph · /metamorph --target <id> · /metamorph-report"
-      : "Warm-up — /metamorph-report to view · suggestions after warm-up"
+      ? "/metamorph to improve · /metamorph --target <id> for one target · /metamorph-report to refresh"
+      : `Warming up — ${remaining} more session${remaining === 1 ? "" : "s"} until improvement suggestions unlock · /metamorph-report to view`
   );
 
   const reportPath = path.join(pluginRoot, "report.md");

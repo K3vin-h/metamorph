@@ -17,8 +17,8 @@ const suggestionsDir = (pluginRoot: string) => path.join(pluginRoot, "suggestion
 const dataDir = (pluginRoot: string) => path.join(pluginRoot, "data");
 
 const CLAUDE_MD_IDS = new Set(["global", "local", "claudemd"]);
-const MAX_SECTION_SNIPPET_CHARS = 600;
-const MAX_CONTEXT_SECTIONS = 3;
+const MAX_SECTION_SNIPPET_CHARS = 400;
+const MAX_CONTEXT_SECTIONS = 2;
 
 export interface PreparedTarget {
   id: string;
@@ -154,7 +154,7 @@ function readTargetFile(
 
   const content = fs.readFileSync(filePath, "utf8");
   const lines = content.split("\n");
-  if (lines.length <= 60) return content;
+  if (lines.length <= 40) return content;
   const fmEnd = lines.findIndex((l, i) => i > 0 && l.trim() === "---");
   const headEnd = fmEnd > 0 ? fmEnd + 1 : 40;
   return `${lines.slice(0, headEnd).join("\n")}\n\n[... truncated ${lines.length - headEnd} lines ...]`;
@@ -270,7 +270,7 @@ function buildContext(
   if (unusedTools) context.unusedTools = unusedTools;
   if (Object.keys(sections).length > 0) context.sections = sections;
   if (analysis.feedback.length > 0) {
-    context.feedback = analysis.feedback.slice(-2).map((f) => f.slice(0, 120));
+    context.feedback = analysis.feedback.slice(-1).map((f) => f.slice(0, 80));
   }
 
   fs.mkdirSync(dataDir(pluginRoot), { recursive: true });

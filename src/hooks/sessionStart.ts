@@ -57,9 +57,11 @@ export async function sessionStart(pluginRoot: string, _claudeRoot: string): Pro
   const lines: string[] = ["─".repeat(50), "metamorph"];
 
   if (!warmupMet) {
-    lines.push(`  warming up: ${sessionCount}/${config.warmupSessions} sessions`);
+    const remaining = config.warmupSessions - sessionCount;
+    lines.push(`  warming up: ${sessionCount}/${config.warmupSessions} — ${remaining} more session${remaining === 1 ? "" : "s"} until /metamorph unlocks`);
   } else {
     lines.push(`  sessions: ${sessionCount} | agents: ${totals.agentRuns} runs | skills: ${totals.skillLoads} loads`);
+    lines.push("  run /metamorph to improve · /metamorph --status for details");
   }
 
   if (topFlags.length > 0) {

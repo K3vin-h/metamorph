@@ -29,7 +29,9 @@ export function printImproveTargets(pluginRoot: string, analysis: AnalysisResult
   for (const line of formatAsciiTargetTable("Skills", analysis.skills)) {
     console.log(line);
   }
-  console.log(`Max per run: ${config.maxSuggestionsPerRun} (lowest scores kept if you pick more)`);
+  console.log("Score: 0–30 needs attention · 31–70 moderate usage · 71–100 healthy");
+  console.log("Flags: never=not used · rare=low usage · hot=high demand · tool=unused declared tool · dead=inactive section · mistake=recurring correction patterns");
+  console.log(`\nMax per run: ${config.maxSuggestionsPerRun} (lowest scores prioritized)`);
 }
 
 export function printImproveStatus(pluginRoot: string, analysis: AnalysisResult): void {

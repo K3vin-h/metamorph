@@ -94,11 +94,12 @@ export async function updateCache(
   pluginRoot: string,
   claudeRoot: string,
   currentSessionId: string
-): Promise<ProfileCache> {
+): Promise<number> {
   const config = loadConfig(pluginRoot);
   const cache = readCache(pluginRoot);
   if (!cache.failedSessions) cache.failedSessions = {};
 
+  let newSessions = 0;
   const transcripts = findTranscriptFiles(claudeRoot, pluginRoot);
 
   for (const { sessionId, filePath } of transcripts) {
@@ -114,6 +115,7 @@ export async function updateCache(
         pluginRoot
       );
       cache.sessions[sessionId] = profile;
+      newSessions++;
     } catch (err) {
       recordParseFailure(cache, sessionId, err, pluginRoot, `parse-transcript:${sessionId}`);
     }
@@ -154,6 +156,7 @@ export async function updateCache(
             profile.agentInvocations[agentType] = (profile.agentInvocations[agentType] ?? 0) + 1;
           }
           cache.sessions[subSessionId] = profile;
+          newSessions++;
         } catch (err) {
           recordParseFailure(cache, subSessionId, err, pluginRoot, `parse-subagent:${subSessionId}`);
         }
@@ -161,12 +164,12 @@ export async function updateCache(
     }
   }
 
-  if (config.read.mistakeTracking && config.read.transcripts !== "off") {
+  if (newSessions > 0 && config.read.mistakeTracking && config.read.transcripts !== "off") {
     await backfillMistakeEvents(pluginRoot, claudeRoot, cache, config.read.transcripts, config.read.denyGlobs);
+    writeCache(pluginRoot, cache);
   }
 
-  writeCache(pluginRoot, cache);
-  return cache;
+  return newSessions;
 }
 
 async function backfillMistakeEvents(
@@ -176,13 +179,13 @@ async function backfillMistakeEvents(
   mode: import("../types.js").PrivacyMode,
   denyGlobs: string[]
 ): Promise<void> {
-  const { parseMistakesFromTranscript } = await import("./mistakeParser.js");
+  const { collectSessionMistakeEvents } = await import("./mistakeParser.js");
 
   for (const { sessionId, filePath } of findTranscriptFiles(claudeRoot, pluginRoot)) {
     const existing = cache.sessions[sessionId];
     if (!existing) continue;
+    if (existing.mistakeEvents !== undefined) continue; // already backfilled
 
-    const { collectSessionMistakeEvents } = await import("./mistakeParser.js");
     existing.mistakeEvents = await collectSessionMistakeEvents(
       filePath,
       sessionId,

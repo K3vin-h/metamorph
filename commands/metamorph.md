@@ -50,7 +50,11 @@ node "${CLAUDE_PLUGIN_ROOT}/dist/index.js" improve-targets
 Print the CLI output verbatim, then ask:
 
 ```
-Which targets? IDs (e.g. architect tdd-guide), top 3, top N, or all:
+Which targets to improve?
+  • Space-separated IDs:    architect code-reviewer tdd-guide
+  • Lowest-scoring N:       top 3  (or top 5, top 10, etc.)
+  • Everything allowed:     all
+  • Skip:                   none
 ```
 
 Parse selection: agent/skill ids, `global`, `local`, `claudemd`; `top N` = N lowest scores across agents+skills; `all` = everything allowed.
