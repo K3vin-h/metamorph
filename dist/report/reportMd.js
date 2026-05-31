@@ -39,7 +39,6 @@ const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const config_js_1 = require("../config.js");
 const targetTable_js_1 = require("./targetTable.js");
-const actionableTargets_js_1 = require("../improve/actionableTargets.js");
 /** Regenerate report.md from data/analysis.json (updates format after plugin upgrades). */
 function refreshReportFromDisk(pluginRoot) {
     const analysisPath = path.join(pluginRoot, "data", "analysis.json");
@@ -104,18 +103,7 @@ function generateReportMd(pluginRoot, analysis) {
     lines.push("", "Legend:", "  Scores: 0–30 needs attention · 31–70 moderate · 71–100 healthy", "  Flags: inactive=unused · underused=low score · healthy=active · tool-gap=declared tool unused", "         stale-doc=inactive section · correction=repeated fixes", "");
     lines.push(...(0, targetTable_js_1.formatAsciiTargetTable)("Agents", agents));
     lines.push(...(0, targetTable_js_1.formatAsciiTargetTable)("Skills", skills));
-    const actionableAgents = (0, actionableTargets_js_1.filterActionableTargets)(agents, config).slice(0, 5);
-    const actionableSkills = (0, actionableTargets_js_1.filterActionableTargets)(skills, config).slice(0, 5);
-    const neverCount = (0, actionableTargets_js_1.countNeverUsed)(agents) + (0, actionableTargets_js_1.countNeverUsed)(skills);
-    lines.push("", "## Recommended to improve", "");
-    if (actionableAgents.length === 0 && actionableSkills.length === 0) {
-        lines.push("_No used targets yet — invoke agents/skills in sessions first._");
-    }
-    else {
-        lines.push(...(0, targetTable_js_1.formatAsciiTargetTable)("Agents", actionableAgents));
-        lines.push(...(0, targetTable_js_1.formatAsciiTargetTable)("Skills", actionableSkills));
-    }
-    lines.push("", `Never used: ${neverCount} — prune from ~/.claude/agents/ or ~/.cursor/skills-cursor/ to reduce routing noise`, "Efficient: /metamorph --target <id> · /metamorph-report (zero LLM)", "");
+    lines.push("", "Efficient: /metamorph --target <id> · /metamorph-report (zero LLM)", "");
     const remaining = config.warmupSessions - sessionCount;
     lines.push(warmupMet
         ? "/metamorph to improve · /metamorph --target <id> for one target · /metamorph-report to refresh"
