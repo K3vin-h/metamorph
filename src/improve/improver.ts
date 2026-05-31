@@ -12,6 +12,7 @@ import { recordSuggestionRejected } from "../mistakeFeedback.js";
 import { mistakePatternsForContext } from "../analyze/mistakeCompact.js";
 import { checkWritePermission, resolveProjectRoot, localClaudeMdPath } from "../permissions.js";
 import { isNeverInvoked, shortFlag } from "./flagsShort.js";
+import { shouldSkipImproveTarget } from "./actionableTargets.js";
 
 const suggestionsDir = (pluginRoot: string) => path.join(pluginRoot, "suggestions");
 const dataDir = (pluginRoot: string) => path.join(pluginRoot, "data");
@@ -291,14 +292,15 @@ export async function prepareImprove(
   targetId: string,
   runId?: string
 ): Promise<PrepareBatchResult> {
-  return prepareImproveBatch(pluginRoot, claudeRoot, [targetId], runId);
+  return prepareImproveBatch(pluginRoot, claudeRoot, [targetId], runId, true);
 }
 
 export async function prepareImproveBatch(
   pluginRoot: string,
   claudeRoot: string,
   targetIds: string[],
-  existingRunId?: string
+  existingRunId?: string,
+  force = false
 ): Promise<PrepareBatchResult> {
   if (targetIds.length === 0) {
     throw new Error("No target IDs provided.");
@@ -336,6 +338,12 @@ export async function prepareImproveBatch(
     const skip = validateTargetFile(resolved, config, claudeRoot);
     if (skip) {
       skipped.push(skip);
+      continue;
+    }
+
+    const improveSkip = shouldSkipImproveTarget(resolved.profile, config, force);
+    if (improveSkip) {
+      skipped.push({ id: targetId, reason: improveSkip });
       continue;
     }
 

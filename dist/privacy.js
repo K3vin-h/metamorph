@@ -38,6 +38,7 @@ const crypto = __importStar(require("crypto"));
 const path = __importStar(require("path"));
 const security_js_1 = require("./security.js");
 const permissions_js_1 = require("./permissions.js");
+const skillPath_js_1 = require("./skillPath.js");
 const COMMAND_CATEGORIES = ["git", "test", "build", "npm", "yarn", "pnpm", "docker", "python", "node"];
 function detectCommandCategory(command) {
     const lower = command.toLowerCase();
@@ -59,21 +60,29 @@ function extractFileExtensions(input) {
     return [...exts];
 }
 function hashPathStem(filePath) {
-    // Return a hashed, relative-only stem — never an absolute path
     const stem = path.basename(filePath, path.extname(filePath));
     return crypto.createHash("sha256").update(stem).digest("hex").slice(0, 12);
 }
 function extractAgentId(input) {
     if (typeof input.subagent_type === "string")
         return input.subagent_type;
-    if (typeof input.description === "string")
-        return undefined; // can't reliably extract
     return undefined;
 }
 function extractSkillId(input) {
     if (typeof input.skill === "string")
         return input.skill;
     return undefined;
+}
+function attachToolMetadata(event, toolName, input, filePath) {
+    if ((0, skillPath_js_1.isAgentTool)(toolName)) {
+        event.agentId = extractAgentId(input);
+    }
+    if (toolName === "Skill") {
+        event.skillId = extractSkillId(input);
+    }
+    if (toolName === "Read" && typeof filePath === "string") {
+        event.skillId = (0, skillPath_js_1.extractSkillIdFromPath)(filePath);
+    }
 }
 function filterTranscriptEvent(line, sessionId, mode, denyGlobs, claudeRoot) {
     if (mode === "off")
@@ -87,22 +96,23 @@ function filterTranscriptEvent(line, sessionId, mode, denyGlobs, claudeRoot) {
             continue;
         const toolName = block.name;
         const input = block.input ?? {};
-        // Check deny-read globs on file paths in the input
         const filePath = input.file_path ?? input.path;
         if (typeof filePath === "string") {
-            if (!(0, permissions_js_1.checkReadPermission)(filePath, denyGlobs, claudeRoot))
+            const isSkillPathRead = toolName === "Read" && !!(0, skillPath_js_1.extractSkillIdFromPath)(filePath);
+            if (!isSkillPathRead && !(0, permissions_js_1.checkReadPermission)(filePath, denyGlobs, claudeRoot)) {
                 continue;
+            }
         }
         if (mode === "full") {
-            // Scrub secrets from tool inputs before storing
             const scrubbedInput = {};
             for (const [k, v] of Object.entries(input)) {
                 scrubbedInput[k] = typeof v === "string" ? (0, security_js_1.scrubSecrets)(v) : v;
             }
-            events.push({ sessionId, toolName, timestamp, toolInput: scrubbedInput });
+            const event = { sessionId, toolName, timestamp, toolInput: scrubbedInput };
+            attachToolMetadata(event, toolName, input, filePath);
+            events.push(event);
             continue;
         }
-        // redacted mode
         const event = { sessionId, toolName, timestamp };
         event.fileExtensions = extractFileExtensions(input);
         if (typeof filePath === "string") {
@@ -111,12 +121,7 @@ function filterTranscriptEvent(line, sessionId, mode, denyGlobs, claudeRoot) {
         if (toolName === "Bash" && typeof input.command === "string") {
             event.commandCategory = detectCommandCategory(input.command);
         }
-        if (toolName === "Agent") {
-            event.agentId = extractAgentId(input);
-        }
-        if (toolName === "Skill") {
-            event.skillId = extractSkillId(input);
-        }
+        attachToolMetadata(event, toolName, input, filePath);
         events.push(event);
     }
     return events;

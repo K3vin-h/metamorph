@@ -1,6 +1,6 @@
 # metamorph
 
-**Version 1.2.0**
+**Version 1.2.1**
 
 metamorph is a plugin for **Claude Code**, **Cursor**, and **Codex** that studies how you actually use your **agents**, **skills**, and **CLAUDE.md** files. It builds a text **dashboard**, scores each target, and proposes small file edits as **diffs** (proposed changes). Nothing is written to disk until you approve it.
 
@@ -186,16 +186,43 @@ Warm-up improves data quality; it is not a hard lock on commands.
 
 ---
 
+## Efficient usage (token savings)
+
+| Practice | Effect |
+|----------|--------|
+| `/metamorph-report` | Zero LLM — dashboard only; hooks refresh on session end |
+| `/metamorph --target <id>` | Skip stats tables + multi-target prep when you know the target |
+| Actionable targets only | Default interactive flow uses `improve-targets-actionable` (excludes never-used) |
+| `improve.skipNeverInvoked: true` | Batch prepare skips never-invoked agents/skills (default in 1.2.1) |
+| `transcripts: redacted` | Smaller cache — default; use `full` only if you need mistake text |
+| Prune unused agents/skills | Biggest routing win — remove from `~/.claude/agents/` or `~/.cursor/skills-cursor/` |
+
+**Config migration** (if your runtime config still has `transcripts: full`):
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/dist/index.js" config-set read.transcripts redacted
+```
+
+**After upgrading to 1.2.1**, run one `session-end` to re-parse transcripts with improved Cursor `Task` / `Read` skill tracking:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/dist/index.js" session-end
+```
+
+**Recommended improve targets** (when you have usage data): agents/skills with score ≥ 30 and non-`never` flags — e.g. `code-reviewer`, `security-reviewer`, `graphify`. Skip `architect`-class agents until you actually invoke them.
+
+---
+
 ## Commands
 
 ### Core
 
 | Command | Description |
 |---------|-------------|
-| `/metamorph` | Interactive: stats → target selection → diffs → approval |
-| `/metamorph --status` | Warm-up progress, last analysis timestamp, top flags |
-| `/metamorph --target <id>` | Improve a single target directly |
-| `/metamorph-report` | Refresh and display `report.md` |
+| `/metamorph` | Interactive: actionable targets → diffs → approval |
+| `/metamorph --status` | Warm-up progress, recommended target IDs, top flags |
+| `/metamorph --target <id>` | Improve a single target directly (preferred for token savings) |
+| `/metamorph-report` | Refresh and display `report.md` (zero LLM) |
 
 **Target IDs:** agent/skill names (`architect`, `backend-patterns`), or `global` / `local` for CLAUDE.md.
 
@@ -353,6 +380,11 @@ Only a compact slice (max 3 patterns, 2 examples, 80 characters each) is passed 
 | `read.scope` | `global`, `project`, `both` | `both` |
 | `read.transcripts` | `full`, `redacted`, `off` | `redacted` |
 | `read.mistakeTracking` | `true`, `false` | `true` |
+| `read.trackCursor` | `true`, `false` | `true` |
+| `read.trackCodex` | `true`, `false` | `true` |
+| `improve.skipNeverInvoked` | `true`, `false` | `true` |
+| `improve.minScore` | 0–100 | 30 |
+| `improve.minInvocations` | 0–100 | 1 |
 | `write.targets.agents` | `true`, `false` | `true` |
 | `write.targets.skills` | `true`, `false` | `true` |
 | `write.targets.claudeMd` | `false`, `global`, `local`, `both` | `false` |

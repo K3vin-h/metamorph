@@ -23,6 +23,11 @@ const DEFAULTS: Config = {
   },
   style: { deriveGuide: true, preserveSkeleton: true },
   trackers: ["agentFreq", "toolMix", "langs", "deadWeight", "timeOfDay", "acceptReject", "modelUse"],
+  improve: {
+    skipNeverInvoked: true,
+    minScore: 30,
+    minInvocations: 1,
+  },
 };
 
 function stripJsoncComments(text: string): string {
@@ -86,6 +91,7 @@ function mergeWithDefaults(raw: unknown): Config {
   const write = (typeof r.write === "object" && r.write !== null ? r.write : {}) as Record<string, unknown>;
   const targets = (typeof write.targets === "object" && write.targets !== null ? write.targets : {}) as Record<string, unknown>;
   const style = (typeof r.style === "object" && r.style !== null ? r.style : {}) as Record<string, unknown>;
+  const improve = (typeof r.improve === "object" && r.improve !== null ? r.improve : {}) as Record<string, unknown>;
 
   return {
     mode: "suggest",
@@ -119,6 +125,20 @@ function mergeWithDefaults(raw: unknown): Config {
       preserveSkeleton: typeof style.preserveSkeleton === "boolean" ? style.preserveSkeleton : DEFAULTS.style.preserveSkeleton,
     },
     trackers: Array.isArray(r.trackers) ? r.trackers.filter((t): t is string => typeof t === "string") : DEFAULTS.trackers,
+    improve: {
+      skipNeverInvoked:
+        typeof improve.skipNeverInvoked === "boolean"
+          ? improve.skipNeverInvoked
+          : DEFAULTS.improve.skipNeverInvoked,
+      minScore:
+        typeof improve.minScore === "number"
+          ? Math.max(0, Math.min(100, improve.minScore))
+          : DEFAULTS.improve.minScore,
+      minInvocations:
+        typeof improve.minInvocations === "number"
+          ? Math.max(0, Math.min(100, improve.minInvocations))
+          : DEFAULTS.improve.minInvocations,
+    },
   };
 }
 

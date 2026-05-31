@@ -14,7 +14,7 @@ export interface PrepareBatchResult {
     skipped: SkippedTarget[];
 }
 export declare function prepareImprove(pluginRoot: string, claudeRoot: string, targetId: string, runId?: string): Promise<PrepareBatchResult>;
-export declare function prepareImproveBatch(pluginRoot: string, claudeRoot: string, targetIds: string[], existingRunId?: string): Promise<PrepareBatchResult>;
+export declare function prepareImproveBatch(pluginRoot: string, claudeRoot: string, targetIds: string[], existingRunId?: string, force?: boolean): Promise<PrepareBatchResult>;
 export declare function formatPrepareBatchResult(result: PrepareBatchResult): string;
 export declare function approveImprovement(pluginRoot: string, claudeRoot: string, id: string): Promise<void>;
 export declare function rejectImprovement(pluginRoot: string, id: string): Promise<void>;

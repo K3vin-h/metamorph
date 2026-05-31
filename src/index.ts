@@ -72,9 +72,9 @@ async function runPrepareImprove(targetId: string, runId?: string): Promise<void
   console.log(formatPrepareBatchResult(result));
 }
 
-async function runPrepareImproveBatch(targetIds: string[]): Promise<void> {
+async function runPrepareImproveBatch(targetIds: string[], force = false): Promise<void> {
   const { prepareImproveBatch, formatPrepareBatchResult } = await import("./improve/improver.js");
-  const result = await prepareImproveBatch(DATA_ROOT, CLAUDE_ROOT, targetIds);
+  const result = await prepareImproveBatch(DATA_ROOT, CLAUDE_ROOT, targetIds, undefined, force);
   console.log(formatPrepareBatchResult(result));
 }
 
@@ -117,6 +117,19 @@ async function runImproveTargets(): Promise<void> {
   const analysis = JSON.parse(fs.readFileSync(analysisPath, "utf8"));
   const { printImproveTargets } = await import("./improve/improveCli.js");
   printImproveTargets(DATA_ROOT, analysis);
+}
+
+async function runImproveTargetsActionable(): Promise<void> {
+  const fs = await import("fs");
+  const path = await import("path");
+  const analysisPath = path.join(DATA_ROOT, "data", "analysis.json");
+  if (!fs.existsSync(analysisPath)) {
+    console.log("No session data yet. Run a session to begin.");
+    return;
+  }
+  const analysis = JSON.parse(fs.readFileSync(analysisPath, "utf8"));
+  const { printImproveTargetsActionable } = await import("./improve/improveCli.js");
+  printImproveTargetsActionable(DATA_ROOT, analysis);
 }
 
 async function runReportRefresh(): Promise<void> {
@@ -196,9 +209,12 @@ async function main(): Promise<void> {
       case "prepare-improve":
         await runPrepareImprove(args[0], args[1]);
         break;
-      case "prepare-improve-batch":
-        await runPrepareImproveBatch(args);
+      case "prepare-improve-batch": {
+        const force = args[0] === "--force" || process.env.METAMORPH_FORCE === "1";
+        const ids = args[0] === "--force" ? args.slice(1) : args;
+        await runPrepareImproveBatch(ids, force);
         break;
+      }
       case "improve-approve":
         await runImproveApprove(args[0]);
         break;
@@ -213,6 +229,9 @@ async function main(): Promise<void> {
         break;
       case "improve-targets":
         await runImproveTargets();
+        break;
+      case "improve-targets-actionable":
+        await runImproveTargetsActionable();
         break;
       case "improve-status":
         await runImproveStatus();

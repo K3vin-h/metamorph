@@ -3,6 +3,10 @@ import * as path from "path";
 import type { AnalysisResult } from "../types.js";
 import { loadConfig } from "../config.js";
 import { formatAsciiTargetTable } from "./targetTable.js";
+import {
+  countNeverUsed,
+  filterActionableTargets,
+} from "../improve/actionableTargets.js";
 
 /** Regenerate report.md from data/analysis.json (updates format after plugin upgrades). */
 export function refreshReportFromDisk(pluginRoot: string): boolean {
@@ -62,6 +66,25 @@ export function generateReportMd(pluginRoot: string, analysis: AnalysisResult): 
 
   lines.push(...formatAsciiTargetTable("Agents", agents));
   lines.push(...formatAsciiTargetTable("Skills", skills));
+
+  const actionableAgents = filterActionableTargets(agents, config).slice(0, 5);
+  const actionableSkills = filterActionableTargets(skills, config).slice(0, 5);
+  const neverCount = countNeverUsed(agents) + countNeverUsed(skills);
+
+  lines.push("", "## Recommended to improve", "");
+  if (actionableAgents.length === 0 && actionableSkills.length === 0) {
+    lines.push("_No used targets yet — invoke agents/skills in sessions first._");
+  } else {
+    lines.push(...formatAsciiTargetTable("Agents", actionableAgents));
+    lines.push(...formatAsciiTargetTable("Skills", actionableSkills));
+  }
+
+  lines.push(
+    "",
+    `Never used: ${neverCount} — prune from ~/.claude/agents/ or ~/.cursor/skills-cursor/ to reduce routing noise`,
+    "Efficient: /metamorph --target <id> · /metamorph-report (zero LLM)",
+    ""
+  );
 
   const remaining = config.warmupSessions - sessionCount;
   lines.push(

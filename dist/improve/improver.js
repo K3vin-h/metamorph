@@ -52,6 +52,7 @@ const mistakeFeedback_js_1 = require("../mistakeFeedback.js");
 const mistakeCompact_js_1 = require("../analyze/mistakeCompact.js");
 const permissions_js_1 = require("../permissions.js");
 const flagsShort_js_1 = require("./flagsShort.js");
+const actionableTargets_js_1 = require("./actionableTargets.js");
 const suggestionsDir = (pluginRoot) => path.join(pluginRoot, "suggestions");
 const dataDir = (pluginRoot) => path.join(pluginRoot, "data");
 const CLAUDE_MD_IDS = new Set(["global", "local", "claudemd"]);
@@ -256,9 +257,9 @@ function buildContext(runId, resolved, shared, pluginRoot) {
     };
 }
 async function prepareImprove(pluginRoot, claudeRoot, targetId, runId) {
-    return prepareImproveBatch(pluginRoot, claudeRoot, [targetId], runId);
+    return prepareImproveBatch(pluginRoot, claudeRoot, [targetId], runId, true);
 }
-async function prepareImproveBatch(pluginRoot, claudeRoot, targetIds, existingRunId) {
+async function prepareImproveBatch(pluginRoot, claudeRoot, targetIds, existingRunId, force = false) {
     if (targetIds.length === 0) {
         throw new Error("No target IDs provided.");
     }
@@ -289,6 +290,11 @@ async function prepareImproveBatch(pluginRoot, claudeRoot, targetIds, existingRu
         const skip = validateTargetFile(resolved, config, claudeRoot);
         if (skip) {
             skipped.push(skip);
+            continue;
+        }
+        const improveSkip = (0, actionableTargets_js_1.shouldSkipImproveTarget)(resolved.profile, config, force);
+        if (improveSkip) {
+            skipped.push({ id: targetId, reason: improveSkip });
             continue;
         }
         try {

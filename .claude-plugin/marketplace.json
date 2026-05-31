@@ -10,7 +10,7 @@
       "name": "metamorph",
       "source": "./",
       "description": "Observes your actual usage patterns across agents, skills, and CLAUDE.md. Computes utilization scores, generates a habits dashboard, and proposes targeted improvements.",
-      "version": "1.2.0",
+      "version": "1.2.1",
       "author": {
         "name": "Kevin Huang",
         "email": "yyc.kevinh@gmail.com"

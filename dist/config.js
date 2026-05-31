@@ -61,6 +61,11 @@ const DEFAULTS = {
     },
     style: { deriveGuide: true, preserveSkeleton: true },
     trackers: ["agentFreq", "toolMix", "langs", "deadWeight", "timeOfDay", "acceptReject", "modelUse"],
+    improve: {
+        skipNeverInvoked: true,
+        minScore: 30,
+        minInvocations: 1,
+    },
 };
 exports.DEFAULTS = DEFAULTS;
 function stripJsoncComments(text) {
@@ -121,6 +126,7 @@ function mergeWithDefaults(raw) {
     const write = (typeof r.write === "object" && r.write !== null ? r.write : {});
     const targets = (typeof write.targets === "object" && write.targets !== null ? write.targets : {});
     const style = (typeof r.style === "object" && r.style !== null ? r.style : {});
+    const improve = (typeof r.improve === "object" && r.improve !== null ? r.improve : {});
     return {
         mode: "suggest",
         warmupSessions: typeof r.warmupSessions === "number" ? Math.max(1, Math.min(50, r.warmupSessions)) : DEFAULTS.warmupSessions,
@@ -152,6 +158,17 @@ function mergeWithDefaults(raw) {
             preserveSkeleton: typeof style.preserveSkeleton === "boolean" ? style.preserveSkeleton : DEFAULTS.style.preserveSkeleton,
         },
         trackers: Array.isArray(r.trackers) ? r.trackers.filter((t) => typeof t === "string") : DEFAULTS.trackers,
+        improve: {
+            skipNeverInvoked: typeof improve.skipNeverInvoked === "boolean"
+                ? improve.skipNeverInvoked
+                : DEFAULTS.improve.skipNeverInvoked,
+            minScore: typeof improve.minScore === "number"
+                ? Math.max(0, Math.min(100, improve.minScore))
+                : DEFAULTS.improve.minScore,
+            minInvocations: typeof improve.minInvocations === "number"
+                ? Math.max(0, Math.min(100, improve.minInvocations))
+                : DEFAULTS.improve.minInvocations,
+        },
     };
 }
 function loadConfig(pluginRoot) {

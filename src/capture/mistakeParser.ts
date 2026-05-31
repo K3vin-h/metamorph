@@ -10,6 +10,7 @@ import {
   isRejectedToolResult,
 } from "./mistakeSignals.js";
 import { filterTranscriptEvent } from "../privacy.js";
+import { isAgentTool, extractSkillIdFromPath } from "../skillPath.js";
 import type { RawTranscriptLine } from "../types.js";
 
 const MAX_EVENTS_PER_SESSION = 20;
@@ -67,13 +68,23 @@ function registerToolUse(
   let agentId: string | undefined;
   let skillId: string | undefined;
 
-  if (toolName === "Agent" && typeof input.subagent_type === "string") {
+  if (isAgentTool(toolName) && typeof input.subagent_type === "string") {
     agentId = input.subagent_type;
     state.lastAgentId = agentId;
   }
   if (toolName === "Skill" && typeof input.skill === "string") {
     skillId = input.skill;
     state.lastSkillId = skillId;
+  }
+  if (toolName === "Read") {
+    const readPath = input.file_path ?? input.path;
+    if (typeof readPath === "string") {
+      const fromPath = extractSkillIdFromPath(readPath);
+      if (fromPath) {
+        skillId = fromPath;
+        state.lastSkillId = skillId;
+      }
+    }
   }
 
   state.toolUses[toolUseId] = { toolName, agentId, skillId };

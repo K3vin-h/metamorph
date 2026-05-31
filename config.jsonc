@@ -40,5 +40,10 @@
     "timeOfDay",
     "acceptReject",
     "modelUse"
-  ]
+  ],
+  "improve": {
+    "skipNeverInvoked": true,
+    "minScore": 30,
+    "minInvocations": 1
+  }
 }

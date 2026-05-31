@@ -6,8 +6,11 @@ function globToRegex(pattern: string): string {
   const escapeRegex = (s: string) => s.replace(/[.+^${}()|[\]\\]/g, "\\$&");
   let regex = "";
   for (let i = 0; i < pattern.length; ) {
-    if (pattern.slice(i, i + 2) === "**") {
-      regex += "(?:[^/]+/)*";
+    if (pattern.slice(i, i + 3) === "**/") {
+      regex += "(?:.+/)*";
+      i += 3;
+    } else if (pattern.slice(i, i + 2) === "**") {
+      regex += ".*";
       i += 2;
     } else if (pattern[i] === "*") {
       regex += "[^/]*";

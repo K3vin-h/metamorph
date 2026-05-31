@@ -51,7 +51,11 @@ export async function parseTranscript(
 
     if (normalized.lineType === "assistant" || normalized.role === "assistant") {
       for (const block of contentBlocks(normalized.content)) {
-        if (block.type === "tool_use" && block.name === "Agent" && typeof block.id === "string") {
+        if (
+          block.type === "tool_use" &&
+          (block.name === "Agent" || block.name === "Task") &&
+          typeof block.id === "string"
+        ) {
           const input = (block.input ?? {}) as Record<string, unknown>;
           const agentType = input.subagent_type;
           if (typeof agentType === "string") {

@@ -28,6 +28,11 @@ export interface Config {
         preserveSkeleton: boolean;
     };
     trackers: string[];
+    improve: {
+        skipNeverInvoked: boolean;
+        minScore: number;
+        minInvocations: number;
+    };
 }
 export interface PermissionResult {
     allowed: boolean;

@@ -2,6 +2,10 @@ import type { AnalysisResult } from "../types.js";
 import { loadConfig } from "../config.js";
 import { shortFlag } from "./flagsShort.js";
 import { formatAsciiTargetTable } from "../report/targetTable.js";
+import {
+  countNeverUsed,
+  filterActionableTargets,
+} from "./actionableTargets.js";
 
 export function printImproveStats(pluginRoot: string, analysis: AnalysisResult): void {
   const config = loadConfig(pluginRoot);
@@ -42,15 +46,55 @@ export function printImproveTargets(pluginRoot: string, analysis: AnalysisResult
   console.log(`\nMax per run: ${config.maxSuggestionsPerRun} (lowest scores prioritized)`);
 }
 
+export function printImproveTargetsActionable(pluginRoot: string, analysis: AnalysisResult): void {
+  const config = loadConfig(pluginRoot);
+  const actionableAgents = filterActionableTargets(analysis.agents, config);
+  const actionableSkills = filterActionableTargets(analysis.skills, config);
+  const neverCount =
+    countNeverUsed(analysis.agents) + countNeverUsed(analysis.skills);
+
+  console.log("## Recommended targets (used, score ≥ " + config.improve.minScore + ")\n");
+
+  if (actionableAgents.length === 0 && actionableSkills.length === 0) {
+    console.log("No actionable targets yet — use agents/skills in sessions, then re-run session-end.");
+  } else {
+    for (const line of formatAsciiTargetTable("Agents", actionableAgents)) {
+      console.log(line);
+    }
+    for (const line of formatAsciiTargetTable("Skills", actionableSkills)) {
+      console.log(line);
+    }
+  }
+
+  console.log(`\nNever used: ${neverCount} — consider pruning from ~/.claude/agents/ or ~/.cursor/skills-cursor/`);
+  console.log("Efficient: /metamorph --target <id> · /metamorph-report (zero LLM)");
+  console.log(`\nMax per run: ${config.maxSuggestionsPerRun} (pick from recommended, or 'top N')`);
+}
+
 export function printImproveStatus(pluginRoot: string, analysis: AnalysisResult): void {
+  const config = loadConfig(pluginRoot);
+  const actionable = [
+    ...filterActionableTargets(analysis.agents, config),
+    ...filterActionableTargets(analysis.skills, config),
+  ].slice(0, 3);
+
+  printImproveStats(pluginRoot, analysis);
+
+  if (actionable.length > 0) {
+    console.log("Recommended to improve:");
+    for (const t of actionable) {
+      console.log(`  ${t.id} ${t.score}/100 ${shortFlag(t.flags)}`);
+    }
+    console.log(`  → /metamorph --target ${actionable[0].id}`);
+  }
+
   const top = [...analysis.agents, ...analysis.skills]
     .filter((t) => t.flags.length > 0)
     .sort((a, b) => a.score - b.score)
     .slice(0, 3);
 
-  printImproveStats(pluginRoot, analysis);
   if (top.length > 0) {
-    console.log("Top flags:");
+    console.log("Top flags (all targets):");
     for (const t of top) {
       console.log(`  ${t.id} ${t.score}/100 ${shortFlag(t.flags)}`);
     }

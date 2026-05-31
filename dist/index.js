@@ -95,9 +95,9 @@ async function runPrepareImprove(targetId, runId) {
     const result = await prepareImprove(DATA_ROOT, CLAUDE_ROOT, targetId, runId);
     console.log(formatPrepareBatchResult(result));
 }
-async function runPrepareImproveBatch(targetIds) {
+async function runPrepareImproveBatch(targetIds, force = false) {
     const { prepareImproveBatch, formatPrepareBatchResult } = await Promise.resolve().then(() => __importStar(require("./improve/improver.js")));
-    const result = await prepareImproveBatch(DATA_ROOT, CLAUDE_ROOT, targetIds);
+    const result = await prepareImproveBatch(DATA_ROOT, CLAUDE_ROOT, targetIds, undefined, force);
     console.log(formatPrepareBatchResult(result));
 }
 async function runImproveApprove(id) {
@@ -135,6 +135,18 @@ async function runImproveTargets() {
     const analysis = JSON.parse(fs.readFileSync(analysisPath, "utf8"));
     const { printImproveTargets } = await Promise.resolve().then(() => __importStar(require("./improve/improveCli.js")));
     printImproveTargets(DATA_ROOT, analysis);
+}
+async function runImproveTargetsActionable() {
+    const fs = await Promise.resolve().then(() => __importStar(require("fs")));
+    const path = await Promise.resolve().then(() => __importStar(require("path")));
+    const analysisPath = path.join(DATA_ROOT, "data", "analysis.json");
+    if (!fs.existsSync(analysisPath)) {
+        console.log("No session data yet. Run a session to begin.");
+        return;
+    }
+    const analysis = JSON.parse(fs.readFileSync(analysisPath, "utf8"));
+    const { printImproveTargetsActionable } = await Promise.resolve().then(() => __importStar(require("./improve/improveCli.js")));
+    printImproveTargetsActionable(DATA_ROOT, analysis);
 }
 async function runReportRefresh() {
     const { refreshReportFromDisk } = await Promise.resolve().then(() => __importStar(require("./report/reportMd.js")));
@@ -205,9 +217,12 @@ async function main() {
             case "prepare-improve":
                 await runPrepareImprove(args[0], args[1]);
                 break;
-            case "prepare-improve-batch":
-                await runPrepareImproveBatch(args);
+            case "prepare-improve-batch": {
+                const force = args[0] === "--force" || process.env.METAMORPH_FORCE === "1";
+                const ids = args[0] === "--force" ? args.slice(1) : args;
+                await runPrepareImproveBatch(ids, force);
                 break;
+            }
             case "improve-approve":
                 await runImproveApprove(args[0]);
                 break;
@@ -222,6 +237,9 @@ async function main() {
                 break;
             case "improve-targets":
                 await runImproveTargets();
+                break;
+            case "improve-targets-actionable":
+                await runImproveTargetsActionable();
                 break;
             case "improve-status":
                 await runImproveStatus();

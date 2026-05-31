@@ -41,6 +41,7 @@ const readline = __importStar(require("readline"));
 const transcriptLine_js_1 = require("./transcriptLine.js");
 const mistakeSignals_js_1 = require("./mistakeSignals.js");
 const privacy_js_1 = require("../privacy.js");
+const skillPath_js_1 = require("../skillPath.js");
 const MAX_EVENTS_PER_SESSION = 20;
 const MAX_SUMMARY_CHARS = 80;
 function resolveTarget(state, ctx) {
@@ -64,13 +65,23 @@ function pushEvent(state, event) {
 function registerToolUse(state, toolUseId, toolName, input) {
     let agentId;
     let skillId;
-    if (toolName === "Agent" && typeof input.subagent_type === "string") {
+    if ((0, skillPath_js_1.isAgentTool)(toolName) && typeof input.subagent_type === "string") {
         agentId = input.subagent_type;
         state.lastAgentId = agentId;
     }
     if (toolName === "Skill" && typeof input.skill === "string") {
         skillId = input.skill;
         state.lastSkillId = skillId;
+    }
+    if (toolName === "Read") {
+        const readPath = input.file_path ?? input.path;
+        if (typeof readPath === "string") {
+            const fromPath = (0, skillPath_js_1.extractSkillIdFromPath)(readPath);
+            if (fromPath) {
+                skillId = fromPath;
+                state.lastSkillId = skillId;
+            }
+        }
     }
     state.toolUses[toolUseId] = { toolName, agentId, skillId };
 }
