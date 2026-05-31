@@ -53,7 +53,7 @@ export async function sessionEnd(pluginRoot: string, claudeRoot: string): Promis
     analysis = loadAnalysisFromDisk(pluginRoot);
   }
 
-  if (analysis) {
+  if (analysis && newSessions > 0) {
     const currentAnalysis = analysis;
     await Promise.all([
       runStage(pluginRoot, "deriveStyleProfile", async () => {

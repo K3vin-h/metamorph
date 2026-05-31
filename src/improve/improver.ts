@@ -4,7 +4,7 @@ import * as crypto from "crypto";
 import type { AgentProfile, AnalysisResult, Config, StyleProfile } from "../types.js";
 import { loadConfig } from "../config.js";
 import { loadStyleProfile } from "../style.js";
-import { stripDirectives, wrapUntrusted, scrubSecrets, confinePath } from "../security.js";
+import { stripDirectives, wrapUntrusted, scrubSecrets, confinePath, wrapUserSnippet } from "../security.js";
 import { writeWithBackup } from "../rollback/writer.js";
 import { assertSafeId } from "../utils.js";
 import { logHookError } from "../hookErrors.js";
@@ -60,7 +60,7 @@ function loadAnalysis(pluginRoot: string): AnalysisResult | null {
 }
 
 function makeRunId(): string {
-  return `run-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`;
+  return `run-${Date.now()}-${crypto.randomBytes(6).toString("hex")}`;
 }
 
 function resolveClaudeMdPath(id: string, claudeRoot: string): ResolvedTarget | { error: string } {
@@ -270,7 +270,7 @@ function buildContext(
   if (unusedTools) context.unusedTools = unusedTools;
   if (Object.keys(sections).length > 0) context.sections = sections;
   if (analysis.feedback.length > 0) {
-    context.feedback = analysis.feedback.slice(-1).map((f) => f.slice(0, 80));
+    context.feedback = analysis.feedback.slice(-1).map((f) => wrapUserSnippet(f, 80));
   }
 
   fs.mkdirSync(dataDir(pluginRoot), { recursive: true });
@@ -306,6 +306,10 @@ export async function prepareImproveBatch(
 
   for (const id of targetIds) {
     assertSafeId(id, "target id");
+  }
+
+  if (existingRunId) {
+    assertSafeId(existingRunId, "run id");
   }
 
   const analysis = loadAnalysis(pluginRoot);

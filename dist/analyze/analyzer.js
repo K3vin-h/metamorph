@@ -39,12 +39,13 @@ const path = __importStar(require("path"));
 const incrementalCache_js_1 = require("../capture/incrementalCache.js");
 const historyParser_js_1 = require("../capture/historyParser.js");
 const config_js_1 = require("../config.js");
-const feedback_js_1 = require("../feedback.js");
+const security_js_1 = require("../security.js");
 const scorer_js_1 = require("../score/scorer.js");
 const mistakeAggregator_js_1 = require("./mistakeAggregator.js");
 const sessionCounter_js_1 = require("../capture/sessionCounter.js");
 const utils_js_1 = require("../utils.js");
 const hookErrors_js_1 = require("../hookErrors.js");
+const feedback_js_1 = require("../feedback.js");
 function extractSections(content) {
     return content
         .split("\n")
@@ -80,13 +81,18 @@ function loadDefinitionFiles(claudeRoot, category, pluginRoot) {
             if (!file.endsWith(".md"))
                 continue;
             const filePath = path.join(baseDir, file);
+            const confined = (0, security_js_1.confinePath)(filePath, [claudeRoot]);
+            if (!confined) {
+                (0, hookErrors_js_1.logHookError)(pluginRoot, `load-agent-def:${file}`, "path outside allowed roots");
+                continue;
+            }
             try {
-                const content = fs.readFileSync(filePath, "utf8");
+                const content = fs.readFileSync(confined, "utf8");
                 const fm = (0, utils_js_1.parseFrontmatter)(content);
                 const id = fm.name ?? file.replace(".md", "");
                 defs.push({
                     id,
-                    filePath,
+                    filePath: confined,
                     relativePath: path.join("agents", file),
                     declaredTools: extractDeclaredTools(content),
                     sections: extractSections(content),
@@ -105,13 +111,18 @@ function loadDefinitionFiles(claudeRoot, category, pluginRoot) {
             const skillMd = path.join(baseDir, skillDir.name, "SKILL.md");
             if (!fs.existsSync(skillMd))
                 continue;
+            const confined = (0, security_js_1.confinePath)(skillMd, [claudeRoot]);
+            if (!confined) {
+                (0, hookErrors_js_1.logHookError)(pluginRoot, `load-skill-def:${skillDir.name}`, "path outside allowed roots");
+                continue;
+            }
             try {
-                const content = fs.readFileSync(skillMd, "utf8");
+                const content = fs.readFileSync(confined, "utf8");
                 const fm = (0, utils_js_1.parseFrontmatter)(content);
                 const id = fm.name ?? skillDir.name;
                 defs.push({
                     id,
-                    filePath: skillMd,
+                    filePath: confined,
                     relativePath: path.join("skills", skillDir.name, "SKILL.md"),
                     declaredTools: extractDeclaredTools(content),
                     sections: extractSections(content),

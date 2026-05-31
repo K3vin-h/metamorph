@@ -30,6 +30,9 @@ async function runConfigSet(key: string, value: string): Promise<void> {
 }
 
 async function runConfigWrite(json: string): Promise<void> {
+  if (json.length > 64 * 1024) {
+    throw new Error("config-write payload too large (max 64KB)");
+  }
   const { writeConfig, mergeWithDefaults } = await import("./config.js");
   let parsed: unknown;
   try {
@@ -207,9 +210,11 @@ async function main(): Promise<void> {
         await runRollbackList();
         break;
       case "rollback-file":
+        if (!args[0]) throw new Error("rollback-file requires a file path argument");
         await runRollbackFile(args[0]);
         break;
       case "rollback-run":
+        if (!args[0]) throw new Error("rollback-run requires a run ID argument");
         await runRollbackRun(args[0]);
         break;
       default:

@@ -4,11 +4,15 @@ exports.scoreTarget = scoreTarget;
 const security_js_1 = require("../security.js");
 // Keywords that suggest a section's content is being exercised
 const SECTION_KEYWORDS = {
-    "security": ["security", "auth", "secret", "permission"],
-    "testing": ["test", "spec", "coverage", "assert"],
-    "review": ["review", "lint", "check", "audit"],
+    "security": ["security", "auth", "secret", "permission", "credential"],
+    "testing": ["test", "spec", "coverage", "assert", "tdd"],
+    "review": ["review", "lint", "check", "audit", "verify"],
     "rollback": ["rollback", "restore", "undo", "revert"],
-    "setup": ["setup", "install", "configure", "init"],
+    "setup": ["setup", "install", "configure", "init", "bootstrap"],
+    "usage": ["when to use", "use when", "usage", "trigger", "invoke"],
+    "output": ["output", "result", "response", "return", "format"],
+    "steps": ["step", "process", "workflow", "procedure", "how"],
+    "rules": ["rule", "must", "never", "always", "constraint", "guideline"],
 };
 function computeSectionScore(sections, _rawContent, usedTools) {
     if (sections.length === 0)
@@ -59,7 +63,7 @@ function scoreTarget(data, totals, config, kind) {
     // Generate flags
     const flags = [];
     if (invocations === 0) {
-        flags.push({ type: "never-invoked-agent", confidence: "high" });
+        flags.push({ type: kind === "skill" ? "never-applied-skill" : "never-invoked-agent", confidence: "high" });
     }
     else if (combined < config.flagThreshold) {
         flags.push({ type: "rarely-used-agent", confidence: "low" });
@@ -74,12 +78,16 @@ function scoreTarget(data, totals, config, kind) {
             flags.push({ type: "unused-tool", target: tool, confidence: toolConfidence });
         }
     }
-    for (const section of deadSections) {
-        // "dead-section" (high confidence) only in full mode where we can see tool call content.
-        // In redacted/off mode, section coverage is a heuristic — always low confidence.
-        const type = readMode === "full" ? "dead-section" : "low-confidence-dead-section";
-        const confidence = readMode === "full" ? "high" : "low";
-        flags.push({ type, section, confidence });
+    // Only flag dead sections when we have enough invocations to be confident.
+    // With fewer invocations the section keyword matching produces too many false positives.
+    if (invocations >= 5) {
+        for (const section of deadSections) {
+            // "dead-section" (high confidence) only in full mode where we can see tool call content.
+            // In redacted/off mode, section coverage is a heuristic — always low confidence.
+            const type = readMode === "full" ? "dead-section" : "low-confidence-dead-section";
+            const confidence = readMode === "full" ? "high" : "low";
+            flags.push({ type, section, confidence });
+        }
     }
     if (kind === "skill" && loads > 0 && applied === 0) {
         flags.push({ type: "never-applied-skill", confidence: "high" });

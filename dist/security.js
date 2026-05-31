@@ -37,6 +37,8 @@ exports.scrubSecrets = scrubSecrets;
 exports.confinePath = confinePath;
 exports.wrapUntrusted = wrapUntrusted;
 exports.stripDirectives = stripDirectives;
+exports.sanitizeUserSnippet = sanitizeUserSnippet;
+exports.wrapUserSnippet = wrapUserSnippet;
 exports.sha256 = sha256;
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
@@ -61,8 +63,6 @@ function buildSecretPatterns() {
         /\/\/registry\.npmjs\.org\/:_authToken=\S+/g,
         // PEM private key blocks
         /-----BEGIN [A-Z ]+ PRIVATE KEY-----[\s\S]*?-----END [A-Z ]+ PRIVATE KEY-----/g,
-        // Git commit SHAs (40 hex chars) — avoid scrubbing shorter hex strings
-        /\b[0-9a-f]{40}\b/gi,
     ];
 }
 function scrubSecrets(text) {
@@ -137,6 +137,10 @@ const DIRECTIVE_PATTERNS = [
     /\[user\]/gi,
     /<\|im_start\|>/gi,
     /<\|im_end\|>/gi,
+    /<\/?(?:SYSTEM|ASSISTANT|HUMAN|USER|INST|SYS)\b[^>]*>/gi,
+    /<<SYS>>[\s\S]*?<<\/SYS>>/gi,
+    /\[\/INST\]/gi,
+    /\bdeveloper mode\b/gi,
 ];
 function stripDirectives(text) {
     let result = text;
@@ -144,6 +148,14 @@ function stripDirectives(text) {
         result = result.replace(pattern, (match) => "[DIRECTIVE-STRIPPED:" + match.length + "chars]");
     }
     return result;
+}
+/** Scrub + strip user/transcript snippets before LLM context (no wrapper). */
+function sanitizeUserSnippet(text, maxLen = 80) {
+    return stripDirectives(scrubSecrets(text)).slice(0, maxLen);
+}
+/** Same as sanitizeUserSnippet, wrapped for improve-context fields. */
+function wrapUserSnippet(text, maxLen = 80) {
+    return wrapUntrusted(sanitizeUserSnippet(text, maxLen));
 }
 function sha256(content) {
     return crypto.createHash("sha256").update(content, "utf8").digest("hex");

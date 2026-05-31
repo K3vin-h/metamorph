@@ -4,12 +4,13 @@ import type { AnalysisResult, AnalysisTotals, SessionProfile } from "../types.js
 import { readProfileCache } from "../capture/incrementalCache.js";
 import { parseHistory } from "../capture/historyParser.js";
 import { loadConfig } from "../config.js";
-import { readFeedbackEntries } from "../feedback.js";
+import { confinePath } from "../security.js";
 import { scoreTarget } from "../score/scorer.js";
 import { aggregateMistakePatterns } from "./mistakeAggregator.js";
 import { getCount } from "../capture/sessionCounter.js";
 import { parseFrontmatter } from "../utils.js";
 import { logHookError } from "../hookErrors.js";
+import { readFeedbackEntries } from "../feedback.js";
 
 interface DefinitionFile {
   id: string;
@@ -64,13 +65,18 @@ function loadDefinitionFiles(
     for (const file of fs.readdirSync(baseDir)) {
       if (!file.endsWith(".md")) continue;
       const filePath = path.join(baseDir, file);
+      const confined = confinePath(filePath, [claudeRoot]);
+      if (!confined) {
+        logHookError(pluginRoot, `load-agent-def:${file}`, "path outside allowed roots");
+        continue;
+      }
       try {
-        const content = fs.readFileSync(filePath, "utf8");
+        const content = fs.readFileSync(confined, "utf8");
         const fm = parseFrontmatter(content);
         const id = fm.name ?? file.replace(".md", "");
         defs.push({
           id,
-          filePath,
+          filePath: confined,
           relativePath: path.join("agents", file),
           declaredTools: extractDeclaredTools(content),
           sections: extractSections(content),
@@ -85,13 +91,18 @@ function loadDefinitionFiles(
       if (!skillDir.isDirectory()) continue;
       const skillMd = path.join(baseDir, skillDir.name, "SKILL.md");
       if (!fs.existsSync(skillMd)) continue;
+      const confined = confinePath(skillMd, [claudeRoot]);
+      if (!confined) {
+        logHookError(pluginRoot, `load-skill-def:${skillDir.name}`, "path outside allowed roots");
+        continue;
+      }
       try {
-        const content = fs.readFileSync(skillMd, "utf8");
+        const content = fs.readFileSync(confined, "utf8");
         const fm = parseFrontmatter(content);
         const id = fm.name ?? skillDir.name;
         defs.push({
           id,
-          filePath: skillMd,
+          filePath: confined,
           relativePath: path.join("skills", skillDir.name, "SKILL.md"),
           declaredTools: extractDeclaredTools(content),
           sections: extractSections(content),

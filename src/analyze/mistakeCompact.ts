@@ -1,4 +1,5 @@
 import type { MistakePattern } from "../types.js";
+import { sanitizeUserSnippet } from "../security.js";
 
 /** Same caps as other compact improve-context fields (flags, feedback, sections). */
 const CONTEXT_MAX_PATTERNS = 3;
@@ -23,8 +24,10 @@ export function mistakePatternsForContext(
     tool: p.tool,
     n: p.count,
     ex: p.examples.slice(0, CONTEXT_MAX_EXAMPLES).map((e) => ({
-      m: e.mistake.slice(0, CONTEXT_MAX_CHARS),
-      ...(e.correction ? { c: e.correction.slice(0, CONTEXT_MAX_CHARS) } : {}),
+      m: sanitizeUserSnippet(e.mistake, CONTEXT_MAX_CHARS),
+      ...(e.correction
+        ? { c: sanitizeUserSnippet(e.correction, CONTEXT_MAX_CHARS) }
+        : {}),
     })),
   }));
 }

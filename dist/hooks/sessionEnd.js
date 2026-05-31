@@ -57,9 +57,10 @@ function loadAnalysisFromDisk(pluginRoot) {
 async function sessionEnd(pluginRoot, claudeRoot) {
     const sessionId = process.env.CLAUDE_SESSION_ID ?? `session-${Date.now()}`;
     const failures = [];
+    let newSessions = 0;
     await runStage(pluginRoot, "updateCache", async () => {
         const { updateCache } = await Promise.resolve().then(() => __importStar(require("../capture/incrementalCache.js")));
-        await updateCache(pluginRoot, claudeRoot, sessionId);
+        newSessions = await updateCache(pluginRoot, claudeRoot, sessionId);
     }, failures);
     let count = 0;
     await runStage(pluginRoot, "increment", async () => {
@@ -67,23 +68,27 @@ async function sessionEnd(pluginRoot, claudeRoot) {
         count = increment(pluginRoot, sessionId);
     }, failures);
     let analysis = null;
-    await runStage(pluginRoot, "runAnalysis", async () => {
-        const { runAnalysis } = await Promise.resolve().then(() => __importStar(require("../analyze/analyzer.js")));
-        analysis = await runAnalysis(pluginRoot, claudeRoot);
-    }, failures);
+    if (newSessions > 0) {
+        await runStage(pluginRoot, "runAnalysis", async () => {
+            const { runAnalysis } = await Promise.resolve().then(() => __importStar(require("../analyze/analyzer.js")));
+            analysis = await runAnalysis(pluginRoot, claudeRoot);
+        }, failures);
+    }
     if (!analysis) {
         analysis = loadAnalysisFromDisk(pluginRoot);
     }
-    if (analysis) {
+    if (analysis && newSessions > 0) {
         const currentAnalysis = analysis;
-        await runStage(pluginRoot, "deriveStyleProfile", async () => {
-            const { deriveStyleProfile } = await Promise.resolve().then(() => __importStar(require("../style.js")));
-            await deriveStyleProfile(pluginRoot, claudeRoot, currentAnalysis);
-        }, failures);
-        await runStage(pluginRoot, "generateReportMd", async () => {
-            const { generateReportMd } = await Promise.resolve().then(() => __importStar(require("../report/reportMd.js")));
-            generateReportMd(pluginRoot, currentAnalysis);
-        }, failures);
+        await Promise.all([
+            runStage(pluginRoot, "deriveStyleProfile", async () => {
+                const { deriveStyleProfile } = await Promise.resolve().then(() => __importStar(require("../style.js")));
+                await deriveStyleProfile(pluginRoot, claudeRoot, currentAnalysis);
+            }, failures),
+            runStage(pluginRoot, "generateReportMd", async () => {
+                const { generateReportMd } = await Promise.resolve().then(() => __importStar(require("../report/reportMd.js")));
+                generateReportMd(pluginRoot, currentAnalysis);
+            }, failures),
+        ]);
     }
     const { loadConfig } = await Promise.resolve().then(() => __importStar(require("../config.js")));
     const config = loadConfig(pluginRoot);

@@ -57,12 +57,18 @@ export async function rollbackFile(pluginRoot: string, filePath: string): Promis
   let entry = manifest.entries[relPath];
 
   if (!entry) {
-    for (const [k, v] of Object.entries(manifest.entries)) {
-      if (v.originalPath === filePath || path.basename(k) === path.basename(filePath)) {
-        relPath = k;
-        entry = v;
-        break;
-      }
+    const matches = Object.entries(manifest.entries).filter(
+      ([k, v]) => v.originalPath === filePath || path.basename(k) === path.basename(filePath)
+    );
+    if (matches.length > 1) {
+      return {
+        ok: false,
+        error: `Ambiguous filename — use full path. Matches: ${matches.map(([k]) => k).join(", ")}`,
+      };
+    }
+    if (matches.length === 1) {
+      relPath = matches[0][0];
+      entry = matches[0][1];
     }
   }
 

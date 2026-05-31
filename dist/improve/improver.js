@@ -55,8 +55,8 @@ const flagsShort_js_1 = require("./flagsShort.js");
 const suggestionsDir = (pluginRoot) => path.join(pluginRoot, "suggestions");
 const dataDir = (pluginRoot) => path.join(pluginRoot, "data");
 const CLAUDE_MD_IDS = new Set(["global", "local", "claudemd"]);
-const MAX_SECTION_SNIPPET_CHARS = 600;
-const MAX_CONTEXT_SECTIONS = 3;
+const MAX_SECTION_SNIPPET_CHARS = 400;
+const MAX_CONTEXT_SECTIONS = 2;
 function loadAnalysis(pluginRoot) {
     try {
         return JSON.parse(fs.readFileSync(path.join(dataDir(pluginRoot), "analysis.json"), "utf8"));
@@ -66,7 +66,7 @@ function loadAnalysis(pluginRoot) {
     }
 }
 function makeRunId() {
-    return `run-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`;
+    return `run-${Date.now()}-${crypto.randomBytes(6).toString("hex")}`;
 }
 function resolveClaudeMdPath(id, claudeRoot) {
     const normalized = id === "claudemd" ? "global" : id;
@@ -142,7 +142,7 @@ function readTargetFile(filePath, mode) {
         return readOutlineOnly(filePath);
     const content = fs.readFileSync(filePath, "utf8");
     const lines = content.split("\n");
-    if (lines.length <= 60)
+    if (lines.length <= 40)
         return content;
     const fmEnd = lines.findIndex((l, i) => i > 0 && l.trim() === "---");
     const headEnd = fmEnd > 0 ? fmEnd + 1 : 40;
@@ -243,7 +243,7 @@ function buildContext(runId, resolved, shared, pluginRoot) {
     if (Object.keys(sections).length > 0)
         context.sections = sections;
     if (analysis.feedback.length > 0) {
-        context.feedback = analysis.feedback.slice(-2).map((f) => f.slice(0, 120));
+        context.feedback = analysis.feedback.slice(-1).map((f) => (0, security_js_1.wrapUserSnippet)(f, 80));
     }
     fs.mkdirSync(dataDir(pluginRoot), { recursive: true });
     fs.mkdirSync(suggestionsDir(pluginRoot), { recursive: true });
@@ -264,6 +264,9 @@ async function prepareImproveBatch(pluginRoot, claudeRoot, targetIds, existingRu
     }
     for (const id of targetIds) {
         (0, utils_js_1.assertSafeId)(id, "target id");
+    }
+    if (existingRunId) {
+        (0, utils_js_1.assertSafeId)(existingRunId, "run id");
     }
     const analysis = loadAnalysis(pluginRoot);
     if (!analysis)
