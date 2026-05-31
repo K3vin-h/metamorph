@@ -44,21 +44,27 @@ node "${CURSOR_PLUGIN_ROOT:-${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/dist/index.js
 
 Stop after printing (includes recommended target IDs).
 
-**Step 2 — Full report tabs (CLI only).**
+**Step 2 — Full report dashboard.**
 
-Show the same high-level dashboard sections users expect from `/metamorph-report`, but keep it CLI-only and compact:
+Refresh the dashboard file:
 
 ```bash
-node "${CURSOR_PLUGIN_ROOT:-${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/dist/index.js" improve-targets
+node "${CURSOR_PLUGIN_ROOT:-${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/dist/index.js" report-refresh
 ```
 
-Print this output verbatim under:
+If output is `No analysis.json found`, print that and stop.
+
+Read `${CLAUDE_PLUGIN_DATA:-${PLUGIN_DATA:-${CURSOR_PLUGIN_ROOT:-${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}}}/report.md` and print its **full contents verbatim** under:
 
 ```
 ## Report
 ```
 
-This section must include all agent and skill tables, including `never` targets. Do not summarize or hide rows.
+Rules:
+- Preserve the old `report.md` dashboard exactly, including the title, session summary, language/source lines, all agent rows, all skill rows, and the recommended section if present.
+- Do **not** summarize, hide, or rewrite rows.
+- Do **not** convert box-drawing tables to markdown tables.
+- Keep this report section before the suggestions section.
 
 **Step 3 — Suggestions tab (CLI only).**
 
