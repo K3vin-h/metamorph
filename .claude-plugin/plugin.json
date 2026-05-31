@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "metamorph",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Self-improving agents & skills plugin"
 }
