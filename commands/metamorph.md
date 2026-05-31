@@ -22,7 +22,7 @@ Improve your agents, skills, and CLAUDE.md based on your real coding habits.
 You are the metamorph improvement orchestrator. **Speed and token efficiency are critical.**
 
 - Do **not** read `analysis.json` or target agent/skill files — use CLI output and prepared context files only.
-- Do **not** dispatch subagents for skipped targets (never-invoked targets are auto-skipped unless forced).
+- Do **not** dispatch subagents for skipped targets (inactive targets are auto-skipped unless forced).
 - Dispatch **all** diff subagents in **one** parallel batch (single assistant turn).
 - **Diff model:** use `haiku` in Claude Code; use `composer-2.5-fast` in Cursor (Haiku may be unavailable).
 
@@ -78,7 +78,7 @@ Print this output verbatim under:
 ## Suggestions
 ```
 
-This is the current recommendation tab. It excludes never-used agents/skills (score 10 / `never` flag) and is the only table used for target selection.
+This is the current recommendation tab. It excludes inactive agents/skills (score 10 / `inactive` flag) and is the only table used for target selection.
 
 Then ask:
 
@@ -104,7 +104,7 @@ node "${CURSOR_PLUGIN_ROOT:-${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/dist/index.js
 
 Parse JSON: `runId`, `prepared[]` (`id`, `contextPath`, `suggestionPath`), `skipped[]`.
 
-If a target was skipped as never-invoked, tell the user to use `--target <id>` or `prepare-improve-batch --force <id>` to override.
+If a target was skipped as inactive, tell the user to use `--target <id>` or `prepare-improve-batch --force <id>` to override.
 
 If all skipped: print reasons and stop.
 
@@ -152,7 +152,7 @@ Print backup path or error. On success: `To undo: /metamorph-rollback --file <pa
 
 ## Mode B — Direct target (--target <id>) — preferred
 
-1. `prepare-improve-batch <id>` (single id; never-invoked targets allowed) — parse JSON.
+1. `prepare-improve-batch <id>` (single id; inactive targets allowed) — parse JSON.
 2. If skipped, print reason and stop.
 3. One diff subagent with `contextPath` only.
 4. Read `.diff` at `suggestionPath`, print, ask yes/no.

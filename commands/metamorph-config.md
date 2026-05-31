@@ -12,7 +12,7 @@ View or update individual config settings.
 ```
 /metamorph-config show                          # Print current config
 /metamorph-config set warmupSessions=3          # Set a single value
-/metamorph-config set flagThreshold=50          # Set flag threshold
+/metamorph-config set flagThreshold=50          # Set underused threshold
 /metamorph-config set read.transcripts=full     # Set nested value
 /metamorph-config set write.targets.claudeMd=true
 ```
@@ -22,7 +22,7 @@ View or update individual config settings.
 | Key | Type | Description |
 |-----|------|-------------|
 | `warmupSessions` | integer 1–50 | Sessions before suggestions unlock |
-| `flagThreshold` | integer 0–100 | Score below which target is flagged |
+| `flagThreshold` | integer 0–100 | Score below which a used target is marked underused |
 | `maxSuggestionsPerRun` | integer 1–20 | Max targets per /metamorph run |
 | `read.scope` | global/project/both | Which directories to analyze |
 | `read.transcripts` | full/redacted/off | Transcript privacy level |

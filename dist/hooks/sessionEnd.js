@@ -37,6 +37,7 @@ exports.sessionEnd = sessionEnd;
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const hookErrors_js_1 = require("../hookErrors.js");
+const flagsShort_js_1 = require("../improve/flagsShort.js");
 const sessionId_js_1 = require("../sessionId.js");
 async function runStage(pluginRoot, name, fn, failures) {
     try {
@@ -114,7 +115,7 @@ async function sessionEnd(pluginRoot, claudeRoot) {
         if (topFlags.length > 0) {
             lines.push("  flagged targets:");
             for (const t of topFlags) {
-                lines.push(`    ${t.id} score=${t.score} (${t.flags[0].type})`);
+                lines.push(`    ${t.id} score=${t.score} (${(0, flagsShort_js_1.shortFlag)(t.flags)})`);
             }
         }
     }

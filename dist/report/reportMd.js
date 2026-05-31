@@ -85,7 +85,7 @@ function generateReportMd(pluginRoot, analysis) {
         if (parts.length > 1)
             lines.push(`Sources: ${parts.join(" · ")}`);
     }
-    lines.push("", "_Score: 0–30 needs attention · 31–70 moderate · 71–100 healthy_", "_Flags: never=not used · rare=low usage · hot=high demand · tool=unused declared tool · dead=inactive section · mistake=recurring correction patterns_", "");
+    lines.push("", "_Score: 0–30 needs attention · 31–70 moderate · 71–100 healthy_", "_Flags: inactive=unused · underused=low score · healthy=active · tool-gap=declared tool unused · stale-doc=inactive section · correction=repeated fixes_", "");
     lines.push(...(0, targetTable_js_1.formatAsciiTargetTable)("Agents", agents));
     lines.push(...(0, targetTable_js_1.formatAsciiTargetTable)("Skills", skills));
     const actionableAgents = (0, actionableTargets_js_1.filterActionableTargets)(agents, config).slice(0, 5);

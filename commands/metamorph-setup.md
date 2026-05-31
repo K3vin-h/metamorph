@@ -65,7 +65,7 @@ Validate: integer 1–50.
 
 **5. Flag threshold**
 ```
-Flag threshold — score below which a target is flagged for improvement (0–100)
+Flag threshold — score below which a used target is marked underused (0–100)
 Current: [40] > 
 ```
 Validate: integer 0–100.

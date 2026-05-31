@@ -37,6 +37,7 @@ exports.sessionStart = sessionStart;
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const config_js_1 = require("../config.js");
+const flagsShort_js_1 = require("../improve/flagsShort.js");
 function isAnalysisResult(value) {
     if (typeof value !== "object" || value === null)
         return false;
@@ -93,7 +94,7 @@ async function sessionStart(pluginRoot, _claudeRoot) {
         lines.push("  top flags:");
         for (const t of topFlags) {
             const flag = t.flags[0];
-            lines.push(`    ${t.id} (score ${t.score}) — ${flag.type} [${flag.confidence}]`);
+            lines.push(`    ${t.id} (score ${t.score}) — ${(0, flagsShort_js_1.shortFlag)(t.flags)} [${flag.confidence}]`);
         }
     }
     lines.push(`  report: ${path.join(pluginRoot, "report.md")}`);

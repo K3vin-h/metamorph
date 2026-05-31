@@ -2,6 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 import type { AnalysisResult } from "../types.js";
 import { logHookError } from "../hookErrors.js";
+import { shortFlag } from "../improve/flagsShort.js";
 import { resolveSessionId } from "../sessionId.js";
 
 async function runStage(
@@ -96,7 +97,7 @@ export async function sessionEnd(pluginRoot: string, claudeRoot: string): Promis
     if (topFlags.length > 0) {
       lines.push("  flagged targets:");
       for (const t of topFlags) {
-        lines.push(`    ${t.id} score=${t.score} (${t.flags[0].type})`);
+        lines.push(`    ${t.id} score=${t.score} (${shortFlag(t.flags)})`);
       }
     }
   } else {

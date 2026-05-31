@@ -7,19 +7,19 @@ export function shortFlag(flags: AgentProfile["flags"]): string {
   switch (f.type) {
     case "never-invoked-agent":
     case "never-applied-skill":
-      return "never";
+      return "inactive";
     case "rarely-used-agent":
-      return "rare";
+      return "underused";
     case "hot-path":
-      return "hot";
+      return "healthy";
     case "recurring-mistakes":
-      return "mistake";
+      return "correction";
     case "unused-tool":
-      return "tool";
+      return "tool-gap";
     case "dead-section":
-      return "dead";
+      return "stale-doc";
     case "low-confidence-dead-section":
-      return "dead?";
+      return "stale-doc?";
     default:
       return "ok";
   }

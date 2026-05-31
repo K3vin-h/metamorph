@@ -2,6 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 import type { AnalysisResult } from "../types.js";
 import { loadConfig } from "../config.js";
+import { shortFlag } from "../improve/flagsShort.js";
 
 function isAnalysisResult(value: unknown): value is AnalysisResult {
   if (typeof value !== "object" || value === null) return false;
@@ -68,7 +69,7 @@ export async function sessionStart(pluginRoot: string, _claudeRoot: string): Pro
     lines.push("  top flags:");
     for (const t of topFlags) {
       const flag = t.flags[0];
-      lines.push(`    ${t.id} (score ${t.score}) — ${flag.type} [${flag.confidence}]`);
+      lines.push(`    ${t.id} (score ${t.score}) — ${shortFlag(t.flags)} [${flag.confidence}]`);
     }
   }
 

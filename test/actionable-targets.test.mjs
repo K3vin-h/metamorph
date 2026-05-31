@@ -6,6 +6,7 @@ import {
   isActionableTarget,
   shouldSkipImproveTarget,
 } from "../dist/improve/actionableTargets.js";
+import { displayFlag, shortFlag } from "../dist/improve/flagsShort.js";
 
 const config = {
   improve: {
@@ -79,5 +80,19 @@ describe("actionable target filtering", () => {
 
     assert.match(shouldSkipImproveTarget(never, config, false), /never invoked/);
     assert.equal(shouldSkipImproveTarget(never, config, true), null);
+  });
+});
+
+describe("flag display labels", () => {
+  it("uses professional labels for public reports and commands", () => {
+    assert.equal(shortFlag([{ type: "never-invoked-agent", confidence: "high" }]), "inactive");
+    assert.equal(shortFlag([{ type: "never-applied-skill", confidence: "high" }]), "inactive");
+    assert.equal(shortFlag([{ type: "rarely-used-agent", confidence: "low" }]), "underused");
+    assert.equal(shortFlag([{ type: "hot-path", confidence: "high" }]), "healthy");
+    assert.equal(shortFlag([{ type: "unused-tool", confidence: "low" }]), "tool-gap");
+    assert.equal(shortFlag([{ type: "dead-section", confidence: "high" }]), "stale-doc");
+    assert.equal(shortFlag([{ type: "low-confidence-dead-section", confidence: "low" }]), "stale-doc?");
+    assert.equal(shortFlag([{ type: "recurring-mistakes", confidence: "high" }]), "correction");
+    assert.equal(displayFlag([]), "—");
   });
 });

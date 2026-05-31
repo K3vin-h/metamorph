@@ -15,7 +15,7 @@ Improve your agents, skills, and CLAUDE.md based on your real coding habits acro
 /metamorph --status     # Warm-up + recommended target IDs
 ```
 
-**Token tip:** Prefer `--target` when you know the agent/skill. Never-invoked targets are auto-skipped in batch mode.
+**Token tip:** Prefer `--target` when you know the agent/skill. Inactive targets are auto-skipped in batch mode.
 
 ---
 
@@ -55,7 +55,7 @@ Ask user to pick from recommended list only (`top 3`, IDs, or `none`).
 node "$MM/dist/index.js" prepare-improve-batch id1 id2 id3
 ```
 
-Skipped never-invoked targets need `--target <id>` or `prepare-improve-batch --force <id>`.
+Skipped inactive targets need `--target <id>` or `prepare-improve-batch --force <id>`.
 
 **Step 4 — Parallel diff subagents** (one per prepared target, fast model).
 

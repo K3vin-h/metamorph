@@ -34,7 +34,7 @@ metamorph is a plugin for **Claude Code**, **Cursor**, and **Codex** that studie
 | **Hook** | An automatic script that runs at session start or end — no AI involved |
 | **Token** | A unit of AI usage; only the improvement step consumes tokens |
 | **Diff** | A line-by-line list of what would change in a file |
-| **Flag** | A short label on the dashboard (`never`, `rare`, `hot`, etc.) explaining a finding |
+| **Flag** | A short label on the dashboard (`inactive`, `underused`, `healthy`, etc.) explaining a finding |
 | **Score** | A number from 0–100; lower usually means more room to improve |
 | **Warm-up** | Initial sessions where metamorph collects data before marking the dashboard `ready` (default: 5) |
 
@@ -155,7 +155,7 @@ The wizard configures:
 | **Transcript privacy** | How much session data to store: `full`, `redacted`, or `off` |
 | **Write targets** | Whether metamorph may suggest edits to agents, skills, and/or CLAUDE.md |
 | **Warm-up sessions** | Sessions to collect before the dashboard shows `ready` (default: **5**) |
-| **Flag threshold** | Scores below this value receive the `rare` flag (default: **40**) |
+| **Flag threshold** | Scores below this value receive the `underused` flag (default: **40**) |
 | **Deny-read globs** | File path patterns metamorph must never read (e.g. `**/*.env*`) |
 
 **Shipped defaults** (`config.jsonc`):
@@ -192,8 +192,8 @@ Warm-up improves data quality; it is not a hard lock on commands.
 |----------|--------|
 | `/metamorph-report` | Zero LLM — dashboard only; hooks refresh on session end |
 | `/metamorph --target <id>` | Skip stats tables + multi-target prep when you know the target |
-| Actionable targets only | Default interactive flow uses `improve-targets-actionable` (excludes never-used) |
-| `improve.skipNeverInvoked: true` | Batch prepare skips never-invoked agents/skills (default in 1.2.1) |
+| Actionable targets only | Default interactive flow uses `improve-targets-actionable` (excludes inactive targets) |
+| `improve.skipNeverInvoked: true` | Batch prepare skips inactive agents/skills (default in 1.2.1) |
 | `transcripts: redacted` | Smaller cache — default; use `full` only if you need mistake text |
 | Prune unused agents/skills | Biggest routing win — remove from `~/.claude/agents/` or `~/.cursor/skills-cursor/` |
 
@@ -209,7 +209,7 @@ node "${CLAUDE_PLUGIN_ROOT}/dist/index.js" config-set read.transcripts redacted
 node "${CLAUDE_PLUGIN_ROOT}/dist/index.js" session-end
 ```
 
-**Recommended improve targets** (when you have usage data): agents/skills with score ≥ 30 and non-`never` flags — e.g. `code-reviewer`, `security-reviewer`, `graphify`. Skip `architect`-class agents until you actually invoke them.
+**Recommended improve targets** (when you have usage data): agents/skills with score ≥ 30 and non-`inactive` flags — e.g. `code-reviewer`, `security-reviewer`, `graphify`. Skip `architect`-class agents until you actually invoke them.
 
 ---
 
@@ -286,15 +286,15 @@ Run `/metamorph-report` or open `${CLAUDE_PLUGIN_DATA}/report.md`.
 ts 42% · py 28%
 
 _Score: 0–30 needs attention · 31–70 moderate · 71–100 healthy_
-_Flags: never=not used · rare=low usage · hot=high demand · tool=unused declared tool · dead=inactive section · mistake=recurring correction patterns_
+_Flags: inactive=unused · underused=low score · healthy=active · tool-gap=declared tool unused · stale-doc=inactive section · correction=repeated fixes_
 
 ## Agents (25)
 
 ┌──────────────────────────────┬──────────────┬──────────────┐
 │              id              │    score     │     flag     │
 ├──────────────────────────────┼──────────────┼──────────────┤
-│  architect                   │    10/100    │    never     │
-│  researcher                  │    40/100    │    rare      │
+│  architect                   │    10/100    │  inactive   │
+│  researcher                  │    40/100    │  underused  │
 └──────────────────────────────┴──────────────┴──────────────┘
 ```
 
@@ -316,15 +316,15 @@ Each agent or skill receives a weighted score from **0 to 100**:
 | Flag | Meaning |
 |------|---------|
 | `—` | No primary issue |
-| `never` | Never invoked, or skill never applied |
-| `rare` | Used at least once, but score is below `flagThreshold` (default: below 40) |
-| `hot` | Score ≥ 80 — actively used |
-| `tool` | A declared tool was not seen in your sessions |
-| `dead` | A documentation section may not match your workflow (high confidence in `full` privacy mode) |
-| `dead?` | Same as `dead`, but lower confidence (`redacted` or `off` mode) |
-| `mistake` | Repeated correction patterns detected |
+| `inactive` | No observed use, or a skill loaded but was never applied |
+| `underused` | Used at least once, but score is below `flagThreshold` (default: below 40) |
+| `healthy` | Score is 80 or higher and the target appears active |
+| `tool-gap` | A declared tool was not seen in your sessions |
+| `stale-doc` | A documentation section may not match your workflow (high confidence in `full` privacy mode) |
+| `stale-doc?` | Same as `stale-doc`, but lower confidence (`redacted` or `off` mode) |
+| `correction` | Repeated correction patterns detected |
 
-**Note:** `dead` and `dead?` flags appear only after at least **5 invocations**, to limit false positives.
+**Note:** `stale-doc` and `stale-doc?` flags appear only after at least **5 invocations**, to limit false positives.
 
 ---
 

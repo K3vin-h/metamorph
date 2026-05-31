@@ -42,7 +42,7 @@ export function printImproveTargets(pluginRoot: string, analysis: AnalysisResult
     console.log(line);
   }
   console.log("Score: 0–30 needs attention · 31–70 moderate usage · 71–100 healthy");
-  console.log("Flags: never=not used · rare=low usage · hot=high demand · tool=unused declared tool · dead=inactive section · mistake=recurring correction patterns");
+  console.log("Flags: inactive=unused · underused=low score · healthy=active · tool-gap=declared tool unused · stale-doc=inactive section · correction=repeated fixes");
   console.log(`\nMax per run: ${config.maxSuggestionsPerRun} (lowest scores prioritized)`);
 }
 

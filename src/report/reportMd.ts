@@ -60,7 +60,7 @@ export function generateReportMd(pluginRoot: string, analysis: AnalysisResult): 
   lines.push(
     "",
     "_Score: 0–30 needs attention · 31–70 moderate · 71–100 healthy_",
-    "_Flags: never=not used · rare=low usage · hot=high demand · tool=unused declared tool · dead=inactive section · mistake=recurring correction patterns_",
+    "_Flags: inactive=unused · underused=low score · healthy=active · tool-gap=declared tool unused · stale-doc=inactive section · correction=repeated fixes_",
     ""
   );
 
