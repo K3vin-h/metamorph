@@ -1,10 +1,12 @@
 # metamorph
 
-**Version 1.2.2**
+**Version 1.2.3**
 
 metamorph is a plugin for **Claude Code**, **Cursor**, and **Codex** that studies how you actually use your **agents**, **skills**, and **CLAUDE.md** files. It builds a text **dashboard**, scores each target, and proposes small file edits as **diffs** (proposed changes). Nothing is written to disk until you approve it.
 
 **Suggest-only by design:** metamorph never auto-applies edits. You review every diff first.
+
+**Runtime-only repo:** `main` contains the files users install and run. Source, tests, source maps, and build-only files are intentionally not shipped in this branch.
 
 ---
 
@@ -193,7 +195,7 @@ Warm-up improves data quality; it is not a hard lock on commands.
 | `/metamorph-report` | Zero LLM — dashboard only; hooks refresh on session end |
 | `/metamorph --target <id>` | Skip stats tables + multi-target prep when you know the target |
 | Actionable targets only | Default interactive flow uses `improve-targets-actionable` (excludes inactive targets) |
-| `improve.skipNeverInvoked: true` | Batch prepare skips inactive agents/skills (default in 1.2.2) |
+| `improve.skipNeverInvoked: true` | Batch prepare skips inactive agents/skills (default in 1.2.3) |
 | `transcripts: redacted` | Smaller cache — default; use `full` only if you need mistake text |
 | Prune unused agents/skills | Biggest routing win — remove from `~/.claude/agents/` or `~/.cursor/skills-cursor/` |
 
@@ -203,7 +205,7 @@ Warm-up improves data quality; it is not a hard lock on commands.
 node "${CLAUDE_PLUGIN_ROOT}/dist/index.js" config-set read.transcripts redacted
 ```
 
-**After upgrading to 1.2.2**, run one `session-end` to re-parse transcripts with improved Cursor `Task` / `Read` skill tracking:
+**After upgrading to 1.2.3**, run one `session-end` to re-parse transcripts with improved Cursor `Task` / `Read` skill tracking:
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/dist/index.js" session-end
@@ -445,15 +447,11 @@ Plugin data lives under `${CLAUDE_PLUGIN_DATA}`, typically:
 
 ---
 
-## Developer reference
+## Runtime reference
 
 Source: [github.com/K3vin-h/metamorph](https://github.com/K3vin-h/metamorph)
 
-```bash
-cd metamorph
-npm install
-npm run build
-```
+This branch is the installable plugin. It ships compiled runtime JavaScript in `dist/` and omits source, tests, and build-only files.
 
 CLI: `node "${CLAUDE_PLUGIN_ROOT}/dist/index.js" <command>`
 

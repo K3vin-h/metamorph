@@ -1,1 +1,0 @@
-{"version":3,"file":"transcriptParser.d.ts","sourceRoot":"","sources":["../../src/capture/transcriptParser.ts"],"names":[],"mappings":"AAEA,OAAO,KAAK,EAAE,cAAc,EAAE,WAAW,EAAqB,MAAM,aAAa,CAAC;AAMlF,wBAAsB,eAAe,CACnC,cAAc,EAAE,MAAM,EACtB,SAAS,EAAE,MAAM,EACjB,IAAI,EAAE,WAAW,EACjB,SAAS,EAAE,MAAM,EAAE,EACnB,UAAU,EAAE,MAAM,EAClB,UAAU,CAAC,EAAE,MAAM,GAClB,OAAO,CAAC,cAAc,CAAC,CA2FzB"}

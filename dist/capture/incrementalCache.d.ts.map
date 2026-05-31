@@ -1,1 +1,0 @@
-{"version":3,"file":"incrementalCache.d.ts","sourceRoot":"","sources":["../../src/capture/incrementalCache.ts"],"names":[],"mappings":"AAGA,OAAO,KAAK,EAAE,YAAY,EAAE,MAAM,aAAa,CAAC;AAsJhD,wBAAsB,WAAW,CAC/B,UAAU,EAAE,MAAM,EAClB,UAAU,EAAE,MAAM,EAClB,gBAAgB,EAAE,MAAM,GACvB,OAAO,CAAC,MAAM,CAAC,CAoHjB;AA0BD,wBAAgB,gBAAgB,CAAC,UAAU,EAAE,MAAM,GAAG,YAAY,CAEjE"}

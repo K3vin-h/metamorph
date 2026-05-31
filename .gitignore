@@ -4,5 +4,13 @@ suggestions/
 report.md
 *.log
 .DS_Store
+.claude/
+src/
+test/
+install/
+tsconfig.json
+package-lock.json
+dist/**/*.map
+dist/**/*.d.ts
 backups/*
 !backups/manifest.json
