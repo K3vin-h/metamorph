@@ -1,6 +1,6 @@
 {
   "name": "metamorph",
-  "version": "1.2.4",
+  "version": "1.2.5",
   "description": "Self-improving agents and skills — observes usage, scores targets, and proposes diffs you approve",
   "author": {
     "name": "Kevin Huang",

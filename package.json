@@ -1,6 +1,6 @@
 {
   "name": "metamorph",
-  "version": "1.2.4",
+  "version": "1.2.5",
   "description": "Self-improving agents & skills Claude Code plugin",
   "main": "dist/index.js",
   "engines": {

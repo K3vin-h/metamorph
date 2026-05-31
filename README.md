@@ -1,6 +1,6 @@
 # metamorph
 
-**Version 1.2.4**
+**Version 1.2.5**
 
 metamorph is a plugin for **Claude Code**, **Cursor**, and **Codex** that studies how you actually use your **agents**, **skills**, and **CLAUDE.md** files. It builds a text **dashboard**, scores each target, and proposes small file edits as **diffs** (proposed changes). Nothing is written to disk until you approve it.
 
@@ -192,10 +192,10 @@ Warm-up improves data quality; it is not a hard lock on commands.
 
 | Practice | Effect |
 |----------|--------|
-| `/metamorph-report` | Zero LLM — dashboard only; hooks refresh on session end |
+| `/metamorph-report` | Zero LLM — dashboard only; prints the saved `report.md` path |
 | `/metamorph --target <id>` | Skip stats tables + multi-target prep when you know the target |
 | Actionable targets only | Default interactive flow uses `improve-targets-actionable` (excludes inactive targets) |
-| `improve.skipNeverInvoked: true` | Batch prepare skips inactive agents/skills (default in 1.2.4) |
+| `improve.skipNeverInvoked: true` | Batch prepare skips inactive agents/skills (default in 1.2.5) |
 | `transcripts: redacted` | Smaller cache — default; use `full` only if you need mistake text |
 | Prune unused agents/skills | Biggest routing win — remove from `~/.claude/agents/` or `~/.cursor/skills-cursor/` |
 
@@ -205,7 +205,7 @@ Warm-up improves data quality; it is not a hard lock on commands.
 node "${CLAUDE_PLUGIN_ROOT}/dist/index.js" config-set read.transcripts redacted
 ```
 
-**After upgrading to 1.2.4**, run one `session-end` to re-parse transcripts with improved Cursor `Task` / `Read` skill tracking:
+**After upgrading to 1.2.5**, run one `session-end` to re-parse transcripts with improved Cursor `Task` / `Read` skill tracking:
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/dist/index.js" session-end
@@ -458,7 +458,7 @@ CLI: `node "${CLAUDE_PLUGIN_ROOT}/dist/index.js" <command>`
 | Command | Purpose |
 |---------|---------|
 | `session-start` / `session-end` | Run hooks manually |
-| `report-refresh` | Regenerate `report.md` |
+| `report-refresh` / `report-print` | Regenerate `report.md`; `report-print` also prints the path and dashboard |
 | `improve-stats` / `improve-targets` / `improve-status` | Improve-flow output |
 | `prepare-improve-batch <ids…>` | Build context files (shared run ID) |
 | `prepare-improve <id> [runId]` | Prepare one target |

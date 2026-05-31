@@ -62,16 +62,25 @@ function generateReportMd(pluginRoot, analysis) {
     const { sessionCount, totals, agents, skills, languages } = analysis;
     const warmupMet = sessionCount >= config.warmupSessions;
     const lines = [];
-    lines.push(warmupMet
-        ? `# metamorph · ready`
-        : `# metamorph · warm-up ${sessionCount}/${config.warmupSessions}`);
-    lines.push(`${totals.sessions} sessions · ${totals.toolCalls} tools · ${totals.agentRuns} agent runs · ${totals.skillLoads} skill loads · ${analysis.readMode}`);
+    lines.push("# metamorph report", "");
+    lines.push("```text");
+    lines.push("╭────────────────────────────────────────────╮");
+    lines.push("│              METAMORPH REPORT              │");
+    lines.push("╰────────────────────────────────────────────╯");
+    lines.push("");
+    lines.push(`Status: ${warmupMet ? "ready" : `warm-up ${sessionCount}/${config.warmupSessions}`}`);
+    lines.push(`Summary: ${totals.sessions} sessions · ${totals.toolCalls} tools · ${totals.agentRuns} agent runs · ${totals.skillLoads} skill loads`);
+    lines.push(`Privacy: ${analysis.readMode}`);
+    const languageAllowlist = new Set([
+        "bash", "c", "cpp", "cs", "css", "diff", "go", "h", "html", "java", "js", "json", "jsonc", "jsonl",
+        "jsx", "kt", "md", "php", "py", "rb", "rs", "scss", "sh", "sql", "swift", "ts", "tsx", "txt", "yaml", "yml", "zsh",
+    ]);
     const langEntries = Object.entries(languages)
-        .filter(([l]) => l.length <= 12 && !l.includes("\n"))
+        .filter(([l]) => languageAllowlist.has(l.toLowerCase()))
         .sort((a, b) => b[1] - a[1])
         .slice(0, 8);
     if (langEntries.length > 0) {
-        lines.push(langEntries.map(([l, p]) => `${l} ${(p * 100).toFixed(0)}%`).join(" · "));
+        lines.push(`Languages: ${langEntries.map(([l, p]) => `${l} ${(p * 100).toFixed(0)}%`).join(" · ")}`);
     }
     if (analysis.totals.sessionsByTool) {
         const { claudeCode, cursor, codex } = analysis.totals.sessionsByTool;
@@ -85,7 +94,7 @@ function generateReportMd(pluginRoot, analysis) {
         if (parts.length > 1)
             lines.push(`Sources: ${parts.join(" · ")}`);
     }
-    lines.push("", "_Score: 0–30 needs attention · 31–70 moderate · 71–100 healthy_", "_Flags: inactive=unused · underused=low score · healthy=active · tool-gap=declared tool unused · stale-doc=inactive section · correction=repeated fixes_", "");
+    lines.push("", "Legend:", "  Scores: 0–30 needs attention · 31–70 moderate · 71–100 healthy", "  Flags: inactive=unused · underused=low score · healthy=active · tool-gap=declared tool unused", "         stale-doc=inactive section · correction=repeated fixes", "");
     lines.push(...(0, targetTable_js_1.formatAsciiTargetTable)("Agents", agents));
     lines.push(...(0, targetTable_js_1.formatAsciiTargetTable)("Skills", skills));
     const actionableAgents = (0, actionableTargets_js_1.filterActionableTargets)(agents, config).slice(0, 5);
@@ -104,6 +113,7 @@ function generateReportMd(pluginRoot, analysis) {
     lines.push(warmupMet
         ? "/metamorph to improve · /metamorph --target <id> for one target · /metamorph-report to refresh"
         : `Warming up — ${remaining} more session${remaining === 1 ? "" : "s"} until improvement suggestions unlock · /metamorph-report to view`);
+    lines.push("```");
     const reportPath = path.join(pluginRoot, "report.md");
     fs.writeFileSync(reportPath, lines.join("\n"), "utf8");
 }

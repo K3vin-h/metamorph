@@ -156,6 +156,18 @@ async function runReportRefresh() {
     }
     console.log("No analysis.json found. Run a session first.");
 }
+async function runReportPrint() {
+    const fs = await Promise.resolve().then(() => __importStar(require("fs")));
+    const { refreshReportFromDisk } = await Promise.resolve().then(() => __importStar(require("./report/reportMd.js")));
+    if (!refreshReportFromDisk(DATA_ROOT)) {
+        console.log("No analysis.json found. Run a session first.");
+        return;
+    }
+    const reportPath = path.join(DATA_ROOT, "report.md");
+    console.log(`Report file: ${reportPath}`);
+    console.log("");
+    console.log(fs.readFileSync(reportPath, "utf8"));
+}
 async function runImproveStatus() {
     const fs = await Promise.resolve().then(() => __importStar(require("fs")));
     const path = await Promise.resolve().then(() => __importStar(require("path")));
@@ -246,6 +258,9 @@ async function main() {
                 break;
             case "report-refresh":
                 await runReportRefresh();
+                break;
+            case "report-print":
+                await runReportPrint();
                 break;
             case "rollback-list":
                 await runRollbackList();
