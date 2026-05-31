@@ -104,7 +104,22 @@ function runtimeCandidates(pluginRoot) {
     return candidates;
 }
 function resolveDataRoot(pluginRoot) {
-    return process.env.CLAUDE_PLUGIN_DATA ?? process.env.PLUGIN_DATA ?? pluginRoot;
+    const explicit = process.env.CLAUDE_PLUGIN_DATA
+        ?? process.env.PLUGIN_DATA
+        ?? process.env.CURSOR_PLUGIN_DATA
+        ?? process.env.CODEX_PLUGIN_DATA;
+    if (explicit) return explicit;
+    // Auto-discover: plugins/cache/{publisher}/{name}/{version}/ → plugins/data/{publisher}-{name}/
+    const parts = path.resolve(pluginRoot).split(path.sep);
+    const cacheIdx = parts.lastIndexOf('cache');
+    if (cacheIdx >= 0 && cacheIdx + 3 < parts.length) {
+        const publisher = parts[cacheIdx + 1];
+        const name = parts[cacheIdx + 2];
+        const dataDir = [...parts.slice(0, cacheIdx), 'data', `${publisher}-${name}`].join(path.sep);
+        if (fs.existsSync(dataDir))
+            return dataDir;
+    }
+    return pluginRoot;
 }
 function ensurePersistentData(pluginRoot, dataRoot) {
     fs.mkdirSync(dataRoot, { recursive: true });
