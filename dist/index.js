@@ -37,7 +37,10 @@ const path = __importStar(require("path"));
 const os = __importStar(require("os"));
 const runtime_js_1 = require("./runtime.js");
 const hookErrors_js_1 = require("./hookErrors.js");
-const PLUGIN_ROOT = process.env.CLAUDE_PLUGIN_ROOT ?? path.dirname(__dirname);
+const PLUGIN_ROOT = process.env.CLAUDE_PLUGIN_ROOT ??
+    process.env.PLUGIN_ROOT ??
+    process.env.CURSOR_PLUGIN_ROOT ??
+    path.dirname(__dirname);
 const CLAUDE_ROOT = path.join(os.homedir(), ".claude");
 const DATA_ROOT = (0, runtime_js_1.resolveDataRoot)(PLUGIN_ROOT);
 (0, runtime_js_1.ensurePersistentData)(PLUGIN_ROOT, DATA_ROOT);
@@ -166,6 +169,14 @@ async function runRollbackRun(runId) {
     const { rollbackRun } = await Promise.resolve().then(() => __importStar(require("./rollback/rollback.js")));
     console.log(await rollbackRun(DATA_ROOT, runId));
 }
+async function runSetupCursor() {
+    const { runSetupCursor } = await Promise.resolve().then(() => __importStar(require("./setup/setupCursor.js")));
+    runSetupCursor(PLUGIN_ROOT);
+}
+async function runSetupCodex() {
+    const { runSetupCodex } = await Promise.resolve().then(() => __importStar(require("./setup/setupCodex.js")));
+    runSetupCodex(PLUGIN_ROOT);
+}
 async function main() {
     const [, , command, ...args] = process.argv;
     try {
@@ -230,6 +241,12 @@ async function main() {
                 if (!args[0])
                     throw new Error("rollback-run requires a run ID argument");
                 await runRollbackRun(args[0]);
+                break;
+            case "setup-cursor":
+                await runSetupCursor();
+                break;
+            case "setup-codex":
+                await runSetupCodex();
                 break;
             default:
                 console.error(`Unknown command: ${command}`);

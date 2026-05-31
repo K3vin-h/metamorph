@@ -21,11 +21,11 @@ You are the metamorph setup wizard. Walk the user through each setting interacti
 Print a welcome banner:
 ```
 metamorph setup wizard
-Settings are saved to ${CLAUDE_PLUGIN_DATA}/config.jsonc
+Settings are saved to ${CLAUDE_PLUGIN_DATA:-${PLUGIN_DATA:-${CURSOR_PLUGIN_ROOT:-${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}}}/config.jsonc
 Press Enter to keep the current value [shown in brackets]
 ```
 
-Read the current config from `${CLAUDE_PLUGIN_DATA}/config.jsonc` (fall back to defaults if missing/invalid).
+Read the current config from `${CLAUDE_PLUGIN_DATA:-${PLUGIN_DATA:-${CURSOR_PLUGIN_ROOT:-${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}}}/config.jsonc` (fall back to defaults if missing/invalid).
 
 Ask each question in order. For each, show the current value in brackets. Accept Enter to keep it.
 
@@ -84,10 +84,40 @@ After all questions, show a summary diff of changes and ask:
 Save these settings? [Y/n] 
 ```
 
-On confirm: write the updated config to `${CLAUDE_PLUGIN_DATA}/config.jsonc` using `node "${CLAUDE_PLUGIN_ROOT}/dist/index.js" config-write '<json>'`.
+On confirm: write the updated config to `${CLAUDE_PLUGIN_DATA:-${PLUGIN_DATA:-${CURSOR_PLUGIN_ROOT:-${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}}}/config.jsonc` using `node "${CURSOR_PLUGIN_ROOT:-${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/dist/index.js" config-write '<json>'`.
+
+**7. Cross-tool installation** (optional)
+
+```
+Install metamorph as a plugin in other tools?
+  [1] Cursor — link plugin to ~/.cursor/plugins/local/metamorph/
+  [2] Codex    — link plugin to ~/.agents/plugins/metamorph/ + personal marketplace
+  [3] Both
+  [4] Skip (default)
+Current: [skip] >
+```
+
+For option 1 or 3:
+```bash
+node "${CURSOR_PLUGIN_ROOT:-${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/dist/index.js" setup-cursor
+```
+
+For option 2 or 3:
+```bash
+node "${CURSOR_PLUGIN_ROOT:-${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/dist/index.js" setup-codex
+```
+
+Print the command output verbatim.
 
 Print confirmation:
 ```
-Settings saved to ${CLAUDE_PLUGIN_DATA}/config.jsonc
+Settings saved to ${CLAUDE_PLUGIN_DATA:-${PLUGIN_DATA:-${CURSOR_PLUGIN_ROOT:-${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}}}/config.jsonc
 Run /metamorph to see your dashboard.
+```
+
+If cross-tool plugins were installed, add:
+```
+Cursor: restart (or Reload Window), then run /metamorph-setup and /metamorph.
+Codex: restart, enable metamorph in the plugin directory, then run /metamorph.
+Sessions from all installed tools are tracked automatically.
 ```

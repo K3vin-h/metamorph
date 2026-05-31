@@ -90,6 +90,67 @@ function findTranscriptFiles(
   return results;
 }
 
+function findCursorTranscripts(
+  cursorRoot: string,
+  pluginRoot: string
+): Array<{ sessionId: string; filePath: string }> {
+  const results: Array<{ sessionId: string; filePath: string }> = [];
+  const projectsDir = path.join(cursorRoot, "projects");
+  if (!fs.existsSync(projectsDir)) return results;
+
+  for (const projectEntry of fs.readdirSync(projectsDir, { withFileTypes: true })) {
+    if (!projectEntry.isDirectory()) continue;
+    const agentTranscriptsDir = path.join(projectsDir, projectEntry.name, "agent-transcripts");
+    if (!fs.existsSync(agentTranscriptsDir)) continue;
+
+    for (const uuidEntry of fs.readdirSync(agentTranscriptsDir, { withFileTypes: true })) {
+      if (!uuidEntry.isDirectory()) continue;
+      const transcriptFile = path.join(agentTranscriptsDir, uuidEntry.name, `${uuidEntry.name}.jsonl`);
+      if (fs.existsSync(transcriptFile)) {
+        results.push({ sessionId: `cursor-${uuidEntry.name}`, filePath: transcriptFile });
+      }
+    }
+  }
+
+  return results;
+}
+
+function findCodexTranscripts(
+  codexRoot: string,
+  pluginRoot: string
+): Array<{ sessionId: string; filePath: string }> {
+  const results: Array<{ sessionId: string; filePath: string }> = [];
+  const sessionsDir = path.join(codexRoot, "sessions");
+  if (!fs.existsSync(sessionsDir)) return results;
+
+  try {
+    for (const yearEntry of fs.readdirSync(sessionsDir, { withFileTypes: true })) {
+      if (!yearEntry.isDirectory()) continue;
+      const yearDir = path.join(sessionsDir, yearEntry.name);
+      for (const monthEntry of fs.readdirSync(yearDir, { withFileTypes: true })) {
+        if (!monthEntry.isDirectory()) continue;
+        const monthDir = path.join(yearDir, monthEntry.name);
+        for (const dayEntry of fs.readdirSync(monthDir, { withFileTypes: true })) {
+          if (!dayEntry.isDirectory()) continue;
+          const dayDir = path.join(monthDir, dayEntry.name);
+          for (const file of fs.readdirSync(dayDir)) {
+            if (file.endsWith(".jsonl")) {
+              results.push({
+                sessionId: `codex-${file.replace(".jsonl", "")}`,
+                filePath: path.join(dayDir, file),
+              });
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    logHookError(pluginRoot, "codex-transcript-scan", err);
+  }
+
+  return results;
+}
+
 export async function updateCache(
   pluginRoot: string,
   claudeRoot: string,
@@ -164,8 +225,48 @@ export async function updateCache(
     }
   }
 
-  if (newSessions > 0 && config.read.mistakeTracking && config.read.transcripts !== "off") {
-    await backfillMistakeEvents(pluginRoot, claudeRoot, cache, config.read.transcripts, config.read.denyGlobs);
+  // Cursor transcripts
+  if (config.read.trackCursor) {
+    const cursorRoot = config.read.cursorRoot ?? path.join(os.homedir(), ".cursor");
+    if (fs.existsSync(cursorRoot)) {
+      for (const { sessionId, filePath } of findCursorTranscripts(cursorRoot, pluginRoot)) {
+        if (cache.sessions[sessionId] || cache.failedSessions?.[sessionId]) continue;
+        try {
+          const profile = await parseTranscript(
+            filePath, sessionId, config.read.transcripts, config.read.denyGlobs, claudeRoot, pluginRoot
+          );
+          cache.sessions[sessionId] = profile;
+          newSessions++;
+        } catch (err) {
+          recordParseFailure(cache, sessionId, err, pluginRoot, `parse-cursor:${sessionId}`);
+        }
+      }
+    }
+  }
+
+  // Codex transcripts
+  if (config.read.trackCodex) {
+    const codexRoot = config.read.codexRoot ?? path.join(os.homedir(), ".codex");
+    if (fs.existsSync(codexRoot)) {
+      for (const { sessionId, filePath } of findCodexTranscripts(codexRoot, pluginRoot)) {
+        if (cache.sessions[sessionId] || cache.failedSessions?.[sessionId]) continue;
+        try {
+          const profile = await parseTranscript(
+            filePath, sessionId, config.read.transcripts, config.read.denyGlobs, claudeRoot, pluginRoot
+          );
+          cache.sessions[sessionId] = profile;
+          newSessions++;
+        } catch (err) {
+          recordParseFailure(cache, sessionId, err, pluginRoot, `parse-codex:${sessionId}`);
+        }
+      }
+    }
+  }
+
+  if (newSessions > 0) {
+    if (config.read.mistakeTracking && config.read.transcripts !== "off") {
+      await backfillMistakeEvents(pluginRoot, claudeRoot, cache, config.read.transcripts, config.read.denyGlobs);
+    }
     writeCache(pluginRoot, cache);
   }
 

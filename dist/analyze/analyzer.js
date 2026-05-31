@@ -36,6 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.runAnalysis = runAnalysis;
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
+const os = __importStar(require("os"));
 const incrementalCache_js_1 = require("../capture/incrementalCache.js");
 const historyParser_js_1 = require("../capture/historyParser.js");
 const config_js_1 = require("../config.js");
@@ -71,7 +72,44 @@ function extractDeclaredTools(content) {
     }
     return [];
 }
-function loadDefinitionFiles(claudeRoot, category, pluginRoot) {
+function loadSkillsFromDirectory(skillsDir, relativePrefix, allowedRoot, pluginRoot, seen) {
+    const defs = [];
+    if (!fs.existsSync(skillsDir))
+        return defs;
+    for (const skillDir of fs.readdirSync(skillsDir, { withFileTypes: true })) {
+        if (!skillDir.isDirectory())
+            continue;
+        const skillMd = path.join(skillsDir, skillDir.name, "SKILL.md");
+        if (!fs.existsSync(skillMd))
+            continue;
+        const confined = (0, security_js_1.confinePath)(skillMd, [allowedRoot]);
+        if (!confined) {
+            (0, hookErrors_js_1.logHookError)(pluginRoot, `load-skill-def:${skillDir.name}`, "path outside allowed roots");
+            continue;
+        }
+        try {
+            const content = fs.readFileSync(confined, "utf8");
+            const fm = (0, utils_js_1.parseFrontmatter)(content);
+            const id = fm.name ?? skillDir.name;
+            if (seen.has(id))
+                continue;
+            seen.add(id);
+            defs.push({
+                id,
+                filePath: confined,
+                relativePath: path.join(relativePrefix, skillDir.name, "SKILL.md"),
+                declaredTools: extractDeclaredTools(content),
+                sections: extractSections(content),
+                rawContent: content,
+            });
+        }
+        catch (err) {
+            (0, hookErrors_js_1.logHookError)(pluginRoot, `load-skill-def:${skillDir.name}`, err);
+        }
+    }
+    return defs;
+}
+function loadDefinitionFiles(claudeRoot, category, pluginRoot, seen) {
     const defs = [];
     const baseDir = path.join(claudeRoot, category === "agents" ? "agents" : "skills");
     if (!fs.existsSync(baseDir))
@@ -105,34 +143,7 @@ function loadDefinitionFiles(claudeRoot, category, pluginRoot) {
         }
     }
     else {
-        for (const skillDir of fs.readdirSync(baseDir, { withFileTypes: true })) {
-            if (!skillDir.isDirectory())
-                continue;
-            const skillMd = path.join(baseDir, skillDir.name, "SKILL.md");
-            if (!fs.existsSync(skillMd))
-                continue;
-            const confined = (0, security_js_1.confinePath)(skillMd, [claudeRoot]);
-            if (!confined) {
-                (0, hookErrors_js_1.logHookError)(pluginRoot, `load-skill-def:${skillDir.name}`, "path outside allowed roots");
-                continue;
-            }
-            try {
-                const content = fs.readFileSync(confined, "utf8");
-                const fm = (0, utils_js_1.parseFrontmatter)(content);
-                const id = fm.name ?? skillDir.name;
-                defs.push({
-                    id,
-                    filePath: confined,
-                    relativePath: path.join("skills", skillDir.name, "SKILL.md"),
-                    declaredTools: extractDeclaredTools(content),
-                    sections: extractSections(content),
-                    rawContent: content,
-                });
-            }
-            catch (err) {
-                (0, hookErrors_js_1.logHookError)(pluginRoot, `load-skill-def:${skillDir.name}`, err);
-            }
-        }
+        return loadSkillsFromDirectory(baseDir, "skills", claudeRoot, pluginRoot, seen ?? new Set());
     }
     return defs;
 }
@@ -211,12 +222,19 @@ async function runAnalysis(pluginRoot, claudeRoot) {
     for (const [k, v] of Object.entries(history.fileExtensions)) {
         agg.fileExtensions[k] = (agg.fileExtensions[k] ?? 0) + v;
     }
+    const sessionIds = Object.keys(cache.sessions);
+    const sessionsByTool = {
+        claudeCode: sessionIds.filter(id => !id.startsWith("cursor-") && !id.startsWith("codex-")).length,
+        cursor: sessionIds.filter(id => id.startsWith("cursor-")).length,
+        codex: sessionIds.filter(id => id.startsWith("codex-")).length,
+    };
     const totals = {
-        sessions: Object.keys(cache.sessions).length,
+        sessions: sessionIds.length,
         toolCalls: agg.totalToolCalls,
         agentRuns: agg.totalAgentRuns,
         skillLoads: agg.totalSkillLoads,
         ...(agg.skippedTranscriptLines > 0 ? { skippedTranscriptLines: agg.skippedTranscriptLines } : {}),
+        sessionsByTool,
     };
     const languages = computeLanguages(agg.fileExtensions);
     const agentDefs = loadDefinitionFiles(claudeRoot, "agents", pluginRoot);
@@ -238,7 +256,19 @@ async function runAnalysis(pluginRoot, claudeRoot) {
         }, totals, config, "agent");
         return mistakePatterns.length > 0 ? { ...profile, mistakePatterns } : profile;
     });
-    const skillDefs = loadDefinitionFiles(claudeRoot, "skills", pluginRoot);
+    // Load skills from all tools — de-duplicate by ID (Claude Code wins)
+    const seenSkillIds = new Set();
+    const skillDefs = loadDefinitionFiles(claudeRoot, "skills", pluginRoot, seenSkillIds);
+    if (config.read.trackCursor) {
+        const cursorRoot = config.read.cursorRoot ?? path.join(os.homedir(), ".cursor");
+        const cursorSkillsDir = path.join(cursorRoot, "skills-cursor");
+        skillDefs.push(...loadSkillsFromDirectory(cursorSkillsDir, "skills-cursor", cursorRoot, pluginRoot, seenSkillIds));
+    }
+    if (config.read.trackCodex) {
+        const codexRoot = config.read.codexRoot ?? path.join(os.homedir(), ".codex");
+        const codexSkillsDir = path.join(codexRoot, "skills");
+        skillDefs.push(...loadSkillsFromDirectory(codexSkillsDir, "codex-skills", codexRoot, pluginRoot, seenSkillIds));
+    }
     const skills = skillDefs.map((def) => {
         const loads = agg.skillLoads[def.id] ?? 0;
         const applied = agg.skillApplied[def.id] ?? 0;

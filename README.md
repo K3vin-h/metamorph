@@ -1,8 +1,8 @@
 # metamorph
 
-**Version 1.1.0**
+**Version 1.2.0**
 
-metamorph is a plugin for **Claude Code** that studies how you actually use your **agents**, **skills**, and **CLAUDE.md** files. It builds a text **dashboard**, scores each target, and proposes small file edits as **diffs** (proposed changes). Nothing is written to disk until you approve it.
+metamorph is a plugin for **Claude Code**, **Cursor**, and **Codex** that studies how you actually use your **agents**, **skills**, and **CLAUDE.md** files. It builds a text **dashboard**, scores each target, and proposes small file edits as **diffs** (proposed changes). Nothing is written to disk until you approve it.
 
 **Suggest-only by design:** metamorph never auto-applies edits. You review every diff first.
 
@@ -12,7 +12,9 @@ metamorph is a plugin for **Claude Code** that studies how you actually use your
 
 | Goal | Command |
 |------|---------|
-| Install | `/plugin marketplace add K3vin-h/metamorph` then `/plugin install metamorph` |
+| Install (Claude Code) | `/plugin marketplace add K3vin-h/metamorph` then `/plugin install metamorph` |
+| Install (Cursor) | Clone to `~/.cursor/plugins/local/metamorph/` and reload |
+| Install (Codex) | `codex plugin marketplace add K3vin-h/metamorph` then enable in plugin directory |
 | First-time setup | `/metamorph-setup` |
 | View dashboard | `/metamorph-report` |
 | Improve agents or skills | `/metamorph` |
@@ -89,6 +91,8 @@ This is the **only step that uses the AI model** and consumes tokens.
 
 ## Installation
 
+### Claude Code
+
 ```bash
 /plugin marketplace add K3vin-h/metamorph
 /plugin install metamorph
@@ -102,6 +106,38 @@ To update:
 ```
 
 Your settings and data in `${CLAUDE_PLUGIN_DATA}` are preserved. After updating, start a new session or run `/metamorph-report` to refresh the dashboard format.
+
+### Cursor
+
+Install from GitHub (clone or download), then load locally:
+
+```bash
+git clone https://github.com/K3vin-h/metamorph.git ~/.cursor/plugins/local/metamorph
+```
+
+Restart Cursor (or **Developer: Reload Window**). Commands (`/metamorph`, `/metamorph-setup`, …), hooks, and skills load from `.cursor-plugin/plugin.json`.
+
+From Claude Code, `/metamorph-setup` can also link the plugin into `~/.cursor/plugins/local/metamorph/` automatically.
+
+### Codex
+
+Add the GitHub marketplace, then install from the plugin directory:
+
+```bash
+codex plugin marketplace add K3vin-h/metamorph
+```
+
+Codex reads `.claude-plugin/marketplace.json` (legacy-compatible) and requires `.codex-plugin/plugin.json` at the plugin root.
+
+For a local checkout during development:
+
+```bash
+codex plugin marketplace add /absolute/path/to/metamorph
+```
+
+Or run `/metamorph-setup` from Claude Code to link the plugin into `~/.agents/plugins/metamorph/` and register a personal marketplace entry.
+
+Restart Codex and enable **metamorph** from the plugin picker. Use `/metamorph` to run improvements; `SessionStart`/`SessionEnd` hooks run automatically.
 
 ---
 

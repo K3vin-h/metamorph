@@ -1,0 +1,22 @@
+{
+  "name": "metamorph",
+  "version": "1.2.0",
+  "description": "Self-improving agents and skills — observes usage, scores targets, and proposes diffs you approve",
+  "author": {
+    "name": "Kevin Huang",
+    "email": "yyc.kevinh@gmail.com"
+  },
+  "homepage": "https://github.com/K3vin-h/metamorph",
+  "repository": "https://github.com/K3vin-h/metamorph",
+  "license": "MIT",
+  "keywords": ["agents", "skills", "improvement", "analytics", "habits"],
+  "skills": "./codex-skills/",
+  "hooks": "./hooks/hooks.json",
+  "interface": {
+    "displayName": "metamorph",
+    "shortDescription": "Self-improving agents and skills from your real coding habits",
+    "longDescription": "Observes session usage across agents and skills, scores each target, publishes a habits dashboard, and proposes surgical diffs — nothing is written until you approve.",
+    "developerName": "Kevin Huang",
+    "category": "Productivity"
+  }
+}

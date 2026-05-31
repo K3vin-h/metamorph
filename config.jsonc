@@ -12,7 +12,9 @@
       "**/*.env*",
       "**/.env",
       "**/credentials*"
-    ]
+    ],
+    "trackCursor": true,
+    "trackCodex": true
   },
   "write": {
     "targets": {

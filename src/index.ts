@@ -3,7 +3,11 @@ import * as os from "os";
 import { ensurePersistentData, resolveDataRoot } from "./runtime.js";
 import { logHookError } from "./hookErrors.js";
 
-const PLUGIN_ROOT = process.env.CLAUDE_PLUGIN_ROOT ?? path.dirname(__dirname);
+const PLUGIN_ROOT =
+  process.env.CLAUDE_PLUGIN_ROOT ??
+  process.env.PLUGIN_ROOT ??
+  process.env.CURSOR_PLUGIN_ROOT ??
+  path.dirname(__dirname);
 const CLAUDE_ROOT = path.join(os.homedir(), ".claude");
 const DATA_ROOT = resolveDataRoot(PLUGIN_ROOT);
 
@@ -153,6 +157,16 @@ async function runRollbackRun(runId: string): Promise<void> {
   console.log(await rollbackRun(DATA_ROOT, runId));
 }
 
+async function runSetupCursor(): Promise<void> {
+  const { runSetupCursor } = await import("./setup/setupCursor.js");
+  runSetupCursor(PLUGIN_ROOT);
+}
+
+async function runSetupCodex(): Promise<void> {
+  const { runSetupCodex } = await import("./setup/setupCodex.js");
+  runSetupCodex(PLUGIN_ROOT);
+}
+
 async function main(): Promise<void> {
   const [, , command, ...args] = process.argv;
 
@@ -216,6 +230,12 @@ async function main(): Promise<void> {
       case "rollback-run":
         if (!args[0]) throw new Error("rollback-run requires a run ID argument");
         await runRollbackRun(args[0]);
+        break;
+      case "setup-cursor":
+        await runSetupCursor();
+        break;
+      case "setup-codex":
+        await runSetupCodex();
         break;
       default:
         console.error(`Unknown command: ${command}`);

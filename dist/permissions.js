@@ -68,6 +68,7 @@ function matchGlob(pattern, filePath) {
 function resolveProjectRoot() {
     const candidates = [
         process.env.CLAUDE_PROJECT_DIR,
+        process.env.CURSOR_PROJECT_DIR,
         process.env.CLAUDE_CODE_PROJECT_DIR,
         process.cwd(),
     ].filter((v) => typeof v === "string" && v.trim().length > 0);

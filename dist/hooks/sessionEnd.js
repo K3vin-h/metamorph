@@ -37,6 +37,7 @@ exports.sessionEnd = sessionEnd;
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const hookErrors_js_1 = require("../hookErrors.js");
+const sessionId_js_1 = require("../sessionId.js");
 async function runStage(pluginRoot, name, fn, failures) {
     try {
         await fn();
@@ -55,7 +56,7 @@ function loadAnalysisFromDisk(pluginRoot) {
     }
 }
 async function sessionEnd(pluginRoot, claudeRoot) {
-    const sessionId = process.env.CLAUDE_SESSION_ID ?? `session-${Date.now()}`;
+    const sessionId = (0, sessionId_js_1.resolveSessionId)();
     const failures = [];
     let newSessions = 0;
     await runStage(pluginRoot, "updateCache", async () => {

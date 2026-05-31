@@ -2,6 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 import type { AnalysisResult } from "../types.js";
 import { logHookError } from "../hookErrors.js";
+import { resolveSessionId } from "../sessionId.js";
 
 async function runStage(
   pluginRoot: string,
@@ -26,7 +27,7 @@ function loadAnalysisFromDisk(pluginRoot: string): AnalysisResult | null {
 }
 
 export async function sessionEnd(pluginRoot: string, claudeRoot: string): Promise<void> {
-  const sessionId = process.env.CLAUDE_SESSION_ID ?? `session-${Date.now()}`;
+  const sessionId = resolveSessionId();
   const failures: string[] = [];
 
   let newSessions = 0;

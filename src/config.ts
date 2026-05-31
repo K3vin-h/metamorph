@@ -13,6 +13,8 @@ const DEFAULTS: Config = {
     transcripts: "redacted" as PrivacyMode,
     mistakeTracking: true,
     denyGlobs: ["projects/**/secrets*", "**/*.env*", "**/.env", "**/credentials*"],
+    trackCursor: true,
+    trackCodex: true,
   },
   write: {
     targets: { agents: true, skills: true, claudeMd: "both" as const },
@@ -98,6 +100,10 @@ function mergeWithDefaults(raw: unknown): Config {
           ? read.mistakeTracking
           : DEFAULTS.read.mistakeTracking,
       denyGlobs: Array.isArray(read.denyGlobs) ? read.denyGlobs.filter((g): g is string => typeof g === "string") : DEFAULTS.read.denyGlobs,
+      trackCursor: typeof read.trackCursor === "boolean" ? read.trackCursor : DEFAULTS.read.trackCursor,
+      trackCodex: typeof read.trackCodex === "boolean" ? read.trackCodex : DEFAULTS.read.trackCodex,
+      ...(typeof read.cursorRoot === "string" ? { cursorRoot: read.cursorRoot } : {}),
+      ...(typeof read.codexRoot === "string" ? { codexRoot: read.codexRoot } : {}),
     },
     write: {
       targets: {

@@ -12,12 +12,12 @@ Display the metamorph habits dashboard.
 **Step 1 — Refresh report (required).** Regenerates `report.md` with current table format:
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/dist/index.js" report-refresh
+node "${CURSOR_PLUGIN_ROOT:-${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/dist/index.js" report-refresh
 ```
 
 If output is `No analysis.json found`, print that and stop.
 
-**Step 2 — Display.** Read `${CLAUDE_PLUGIN_DATA}/report.md` and print its **full contents verbatim** inside a fenced code block:
+**Step 2 — Display.** Read `${CLAUDE_PLUGIN_DATA:-${PLUGIN_DATA:-${CURSOR_PLUGIN_ROOT:-${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}}}/report.md` and print its **full contents verbatim** inside a fenced code block:
 
 ````
 ```text

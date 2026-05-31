@@ -10,6 +10,10 @@ export interface Config {
     transcripts: PrivacyMode;
     mistakeTracking: boolean;
     denyGlobs: string[];
+    trackCursor: boolean;
+    trackCodex: boolean;
+    cursorRoot?: string;
+    codexRoot?: string;
   };
   write: {
     targets: {
@@ -145,6 +149,7 @@ export interface AnalysisTotals {
   agentRuns: number;
   skillLoads: number;
   skippedTranscriptLines?: number;
+  sessionsByTool?: { claudeCode: number; cursor: number; codex: number };
 }
 
 export interface AnalysisResult {

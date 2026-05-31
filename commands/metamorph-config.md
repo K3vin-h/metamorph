@@ -35,15 +35,15 @@ View or update individual config settings.
 
 You are the metamorph config manager.
 
-**If `$ARGUMENTS` starts with `show`:** Read `${CLAUDE_PLUGIN_DATA}/config.jsonc`, print all current settings in a readable table. Note any values that differ from defaults.
+**If `$ARGUMENTS` starts with `show`:** Read `${CLAUDE_PLUGIN_DATA:-${PLUGIN_DATA:-${CURSOR_PLUGIN_ROOT:-${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}}}/config.jsonc`, print all current settings in a readable table. Note any values that differ from defaults.
 
 **If `$ARGUMENTS` starts with `set KEY=VALUE`:**
 1. Parse the key path (dot-separated) and value from arguments
 2. Validate: check key is in the settable list above; validate type and range
 3. If invalid: print a clear error with the valid range/options and stop
-4. Run `node "${CLAUDE_PLUGIN_ROOT}/dist/index.js" config-set '<key>' '<value>'`
+4. Run `node "${CURSOR_PLUGIN_ROOT:-${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/dist/index.js" config-set '<key>' '<value>'`
 5. Print confirmation: `Set <key> = <value> (was: <oldValue>)`
 
 **If no subcommand:** print the usage block above.
 
-All changes are immediately written to `${CLAUDE_PLUGIN_DATA}/config.jsonc` and take effect on the next session-end hook.
+All changes are immediately written to `${CLAUDE_PLUGIN_DATA:-${PLUGIN_DATA:-${CURSOR_PLUGIN_ROOT:-${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}}}/config.jsonc` and take effect on the next session-end hook.

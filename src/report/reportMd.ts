@@ -44,6 +44,15 @@ export function generateReportMd(pluginRoot: string, analysis: AnalysisResult): 
     lines.push(langEntries.map(([l, p]) => `${l} ${(p * 100).toFixed(0)}%`).join(" · "));
   }
 
+  if (analysis.totals.sessionsByTool) {
+    const { claudeCode, cursor, codex } = analysis.totals.sessionsByTool;
+    const parts: string[] = [];
+    if (claudeCode > 0) parts.push(`claude-code: ${claudeCode}`);
+    if (cursor > 0) parts.push(`cursor: ${cursor}`);
+    if (codex > 0) parts.push(`codex: ${codex}`);
+    if (parts.length > 1) lines.push(`Sources: ${parts.join(" · ")}`);
+  }
+
   lines.push(
     "",
     "_Score: 0–30 needs attention · 31–70 moderate · 71–100 healthy_",

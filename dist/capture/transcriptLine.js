@@ -28,11 +28,20 @@ function normalizeTranscriptLine(raw) {
             timestamp,
         };
     }
+    // Codex: { timestamp, type: "response_item", payload: { role, content } }
+    if (raw.type === "response_item" && isRecord(raw.payload)) {
+        const p = raw.payload;
+        if ((p.role === "user" || p.role === "assistant") && typeof p.role === "string") {
+            return { lineType: p.role, role: p.role, content: p.content, timestamp };
+        }
+    }
     if (typeof raw.role === "string") {
+        // Cursor format: { role, message: { content } } — fall back to message.content
+        const content = isRecord(raw.message) ? raw.message.content : raw.content;
         return {
             lineType: raw.role,
             role: raw.role,
-            content: raw.content,
+            content,
             timestamp,
         };
     }

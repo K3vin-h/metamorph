@@ -1,5 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
+import * as os from "os";
 import type { AnalysisResult, AnalysisTotals, SessionProfile } from "../types.js";
 import { readProfileCache } from "../capture/incrementalCache.js";
 import { parseHistory } from "../capture/historyParser.js";
@@ -51,10 +52,51 @@ function extractDeclaredTools(content: string): string[] {
   return [];
 }
 
+function loadSkillsFromDirectory(
+  skillsDir: string,
+  relativePrefix: string,
+  allowedRoot: string,
+  pluginRoot: string,
+  seen: Set<string>
+): DefinitionFile[] {
+  const defs: DefinitionFile[] = [];
+  if (!fs.existsSync(skillsDir)) return defs;
+
+  for (const skillDir of fs.readdirSync(skillsDir, { withFileTypes: true })) {
+    if (!skillDir.isDirectory()) continue;
+    const skillMd = path.join(skillsDir, skillDir.name, "SKILL.md");
+    if (!fs.existsSync(skillMd)) continue;
+    const confined = confinePath(skillMd, [allowedRoot]);
+    if (!confined) {
+      logHookError(pluginRoot, `load-skill-def:${skillDir.name}`, "path outside allowed roots");
+      continue;
+    }
+    try {
+      const content = fs.readFileSync(confined, "utf8");
+      const fm = parseFrontmatter(content);
+      const id = fm.name ?? skillDir.name;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      defs.push({
+        id,
+        filePath: confined,
+        relativePath: path.join(relativePrefix, skillDir.name, "SKILL.md"),
+        declaredTools: extractDeclaredTools(content),
+        sections: extractSections(content),
+        rawContent: content,
+      });
+    } catch (err) {
+      logHookError(pluginRoot, `load-skill-def:${skillDir.name}`, err);
+    }
+  }
+  return defs;
+}
+
 function loadDefinitionFiles(
   claudeRoot: string,
   category: "agents" | "skills",
-  pluginRoot: string
+  pluginRoot: string,
+  seen?: Set<string>
 ): DefinitionFile[] {
   const defs: DefinitionFile[] = [];
   const baseDir = path.join(claudeRoot, category === "agents" ? "agents" : "skills");
@@ -87,31 +129,7 @@ function loadDefinitionFiles(
       }
     }
   } else {
-    for (const skillDir of fs.readdirSync(baseDir, { withFileTypes: true })) {
-      if (!skillDir.isDirectory()) continue;
-      const skillMd = path.join(baseDir, skillDir.name, "SKILL.md");
-      if (!fs.existsSync(skillMd)) continue;
-      const confined = confinePath(skillMd, [claudeRoot]);
-      if (!confined) {
-        logHookError(pluginRoot, `load-skill-def:${skillDir.name}`, "path outside allowed roots");
-        continue;
-      }
-      try {
-        const content = fs.readFileSync(confined, "utf8");
-        const fm = parseFrontmatter(content);
-        const id = fm.name ?? skillDir.name;
-        defs.push({
-          id,
-          filePath: confined,
-          relativePath: path.join("skills", skillDir.name, "SKILL.md"),
-          declaredTools: extractDeclaredTools(content),
-          sections: extractSections(content),
-          rawContent: content,
-        });
-      } catch (err) {
-        logHookError(pluginRoot, `load-skill-def:${skillDir.name}`, err);
-      }
-    }
+    return loadSkillsFromDirectory(baseDir, "skills", claudeRoot, pluginRoot, seen ?? new Set());
   }
 
   return defs;
@@ -212,12 +230,20 @@ export async function runAnalysis(pluginRoot: string, claudeRoot: string): Promi
     agg.fileExtensions[k] = (agg.fileExtensions[k] ?? 0) + v;
   }
 
+  const sessionIds = Object.keys(cache.sessions);
+  const sessionsByTool = {
+    claudeCode: sessionIds.filter(id => !id.startsWith("cursor-") && !id.startsWith("codex-")).length,
+    cursor: sessionIds.filter(id => id.startsWith("cursor-")).length,
+    codex: sessionIds.filter(id => id.startsWith("codex-")).length,
+  };
+
   const totals: AnalysisTotals = {
-    sessions: Object.keys(cache.sessions).length,
+    sessions: sessionIds.length,
     toolCalls: agg.totalToolCalls,
     agentRuns: agg.totalAgentRuns,
     skillLoads: agg.totalSkillLoads,
     ...(agg.skippedTranscriptLines > 0 ? { skippedTranscriptLines: agg.skippedTranscriptLines } : {}),
+    sessionsByTool,
   };
 
   const languages = computeLanguages(agg.fileExtensions);
@@ -247,7 +273,22 @@ export async function runAnalysis(pluginRoot: string, claudeRoot: string): Promi
     return mistakePatterns.length > 0 ? { ...profile, mistakePatterns } : profile;
   });
 
-  const skillDefs = loadDefinitionFiles(claudeRoot, "skills", pluginRoot);
+  // Load skills from all tools — de-duplicate by ID (Claude Code wins)
+  const seenSkillIds = new Set<string>();
+  const skillDefs = loadDefinitionFiles(claudeRoot, "skills", pluginRoot, seenSkillIds);
+
+  if (config.read.trackCursor) {
+    const cursorRoot = config.read.cursorRoot ?? path.join(os.homedir(), ".cursor");
+    const cursorSkillsDir = path.join(cursorRoot, "skills-cursor");
+    skillDefs.push(...loadSkillsFromDirectory(cursorSkillsDir, "skills-cursor", cursorRoot, pluginRoot, seenSkillIds));
+  }
+
+  if (config.read.trackCodex) {
+    const codexRoot = config.read.codexRoot ?? path.join(os.homedir(), ".codex");
+    const codexSkillsDir = path.join(codexRoot, "skills");
+    skillDefs.push(...loadSkillsFromDirectory(codexSkillsDir, "codex-skills", codexRoot, pluginRoot, seenSkillIds));
+  }
+
   const skills = skillDefs.map((def) => {
     const loads = agg.skillLoads[def.id] ?? 0;
     const applied = agg.skillApplied[def.id] ?? 0;

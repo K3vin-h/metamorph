@@ -16,6 +16,14 @@ export function printImproveStats(pluginRoot: string, analysis: AnalysisResult):
     `Tools: ${totals.toolCalls} · Agents: ${totals.agentRuns} runs · Skills: ${totals.skillLoads} loads`
   );
   console.log(`Warm-up: ${warmup}`);
+  if (analysis.totals.sessionsByTool) {
+    const { claudeCode, cursor, codex } = analysis.totals.sessionsByTool;
+    const parts: string[] = [];
+    if (claudeCode > 0) parts.push(`claude-code: ${claudeCode}`);
+    if (cursor > 0) parts.push(`cursor: ${cursor}`);
+    if (codex > 0) parts.push(`codex: ${codex}`);
+    if (parts.length > 1) console.log(`Sources: ${parts.join(" · ")}`);
+  }
   if (analysis.generatedAt) {
     console.log(`Last analysis: ${analysis.generatedAt}`);
   }

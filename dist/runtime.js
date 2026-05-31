@@ -53,12 +53,22 @@ function copyPathIfMissing(src, dest) {
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     fs.copyFileSync(src, dest);
 }
+function readManifestName(manifestPath) {
+    try {
+        if (!fs.existsSync(manifestPath))
+            return null;
+        const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+        return typeof manifest.name === "string" ? manifest.name : null;
+    }
+    catch {
+        return null;
+    }
+}
 function isMetamorphPluginDir(dir) {
     try {
-        const manifestPath = path.join(dir, ".claude-plugin", "plugin.json");
-        if (fs.existsSync(manifestPath)) {
-            const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-            if (manifest.name === "metamorph")
+        for (const manifestDir of [".claude-plugin", ".cursor-plugin", ".codex-plugin"]) {
+            const name = readManifestName(path.join(dir, manifestDir, "plugin.json"));
+            if (name === "metamorph")
                 return true;
         }
         const pkgPath = path.join(dir, "package.json");
@@ -94,7 +104,7 @@ function runtimeCandidates(pluginRoot) {
     return candidates;
 }
 function resolveDataRoot(pluginRoot) {
-    return process.env.CLAUDE_PLUGIN_DATA ?? pluginRoot;
+    return process.env.CLAUDE_PLUGIN_DATA ?? process.env.PLUGIN_DATA ?? pluginRoot;
 }
 function ensurePersistentData(pluginRoot, dataRoot) {
     fs.mkdirSync(dataRoot, { recursive: true });

@@ -28,7 +28,7 @@ You are the metamorph improvement orchestrator. **Speed and token efficiency are
 **Step 1 — Stats (CLI only).**
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/dist/index.js" improve-stats
+node "${CURSOR_PLUGIN_ROOT:-${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/dist/index.js" improve-stats
 ```
 
 If output is `No session data yet`, stop.
@@ -36,7 +36,7 @@ If output is `No session data yet`, stop.
 If `--status`:
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/dist/index.js" improve-status
+node "${CURSOR_PLUGIN_ROOT:-${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/dist/index.js" improve-status
 ```
 
 Stop after printing.
@@ -44,7 +44,7 @@ Stop after printing.
 **Step 2 — Target tables (CLI only).**
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/dist/index.js" improve-targets
+node "${CURSOR_PLUGIN_ROOT:-${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/dist/index.js" improve-targets
 ```
 
 Print the CLI output verbatim, then ask:
@@ -67,7 +67,7 @@ Check `config.write.targets.claudeMd`: use configured scope, or skip if `false`,
 **Step 4 — Batch prepare (one command, one runId).**
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/dist/index.js" prepare-improve-batch id1 id2 id3
+node "${CURSOR_PLUGIN_ROOT:-${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/dist/index.js" prepare-improve-batch id1 id2 id3
 ```
 
 Parse JSON: `runId`, `prepared[]` (`id`, `contextPath`, `suggestionPath`), `skipped[]`.
@@ -107,7 +107,7 @@ Accept which changes? "all" | IDs | "none"
 For each accepted non-empty diff:
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/dist/index.js" improve-approve '<runId>-<id>'
+node "${CURSOR_PLUGIN_ROOT:-${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/dist/index.js" improve-approve '<runId>-<id>'
 ```
 
 Print backup path or error. On success: `To undo: /metamorph-rollback --file <path>`
