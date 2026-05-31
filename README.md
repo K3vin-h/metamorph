@@ -103,7 +103,7 @@ The wizard asks for:
 | Transcript privacy | Store full transcript data, redacted metadata, or almost nothing |
 | Write targets | Allow suggestions for agents, skills, and/or CLAUDE.md |
 | Warm-up sessions | Sessions to observe before the report says `ready` |
-| Flag threshold | Score cutoff for `rare` flags |
+| Flag threshold | The warning line for low scores |
 | Deny-read globs | File patterns metamorph must not read |
 
 Default settings are privacy-conscious:
@@ -210,6 +210,46 @@ Common settings:
 
 Changes apply on the next hook run. You can also edit `config.jsonc` by hand.
 
+### What `flagThreshold` means
+
+metamorph gives each agent and skill a score from **0 to 100**.
+
+Think of the score like a simple health check:
+
+| Score range | What it usually means |
+|-------------|-----------------------|
+| `0` to `39` | Probably needs attention |
+| `40` to `79` | Maybe okay, depends on your workflow |
+| `80` to `100` | Looks useful and active |
+
+`flagThreshold` is the line where metamorph starts warning you about low scores.
+
+The default is:
+
+```text
+flagThreshold = 40
+```
+
+With that default, any score **below 40** gets the `rare` flag.
+
+Examples:
+
+| Score | Threshold | Result |
+|-------|-----------|--------|
+| `25/100` | `40` | Flagged as `rare` |
+| `39/100` | `40` | Flagged as `rare` |
+| `40/100` | `40` | Not flagged as `rare` |
+| `55/100` | `40` | Not flagged as `rare` |
+
+Changing the threshold changes how sensitive metamorph is:
+
+| Threshold | What happens |
+|-----------|--------------|
+| Lower number, like `25` | Fewer things get flagged |
+| Higher number, like `60` | More things get flagged |
+
+If you only want warnings for the weakest agents and skills, lower the threshold. If you want metamorph to point out more possible cleanup work, raise it.
+
 ---
 
 ## Approve, reject, and undo changes
@@ -303,7 +343,7 @@ Flag meanings:
 |------|---------|
 | `-` | Looks fine |
 | `never` | Agent never used, or skill never applied |
-| `rare` | Score is below your threshold |
+| `rare` | Score is below `flagThreshold`, so metamorph thinks it may need attention |
 | `hot` | Score is high and the target appears useful |
 | `tool` | Declared tool usage does not match observed usage |
 | `dead` | A section may not match your workflow |
