@@ -68,7 +68,6 @@ function generateReportMd(pluginRoot, analysis) {
     const { sessionCount, totals, agents, skills, languages } = analysis;
     const warmupMet = sessionCount >= config.warmupSessions;
     const lines = [];
-    lines.push("# metamorph report", "");
     lines.push("```text");
     lines.push("╭────────────────────────────────────────────╮");
     lines.push("│              METAMORPH REPORT              │");

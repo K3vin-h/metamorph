@@ -164,7 +164,7 @@ async function runReportPrint() {
         return;
     }
     const reportPath = path.join(DATA_ROOT, "report.md");
-    console.log(`Report file: [report.md](${reportPath})`);
+    console.log(`## [metamorph report](file://${reportPath})`);
     console.log("");
     console.log(fs.readFileSync(reportPath, "utf8"));
 }
