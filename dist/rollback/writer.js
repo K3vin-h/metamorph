@@ -55,10 +55,16 @@ function manifestRelPath(confined, claudeRoot, projectRoot) {
 }
 const manifestPath = (pluginRoot) => path.join(pluginRoot, "backups", "manifest.json");
 function readManifest(pluginRoot) {
-    try {
-        return JSON.parse(fs.readFileSync(manifestPath(pluginRoot), "utf8"));
+    const p = manifestPath(pluginRoot);
+    if (!fs.existsSync(p)) {
+        return { entries: {} };
     }
-    catch {
+    try {
+        return JSON.parse(fs.readFileSync(p, "utf8"));
+    }
+    catch (err) {
+        // Corrupt manifest = lost rollback history; surface it instead of failing silently
+        (0, hookErrors_js_1.logHookError)(pluginRoot, "read-manifest", `manifest.json corrupted — rollback history unavailable: ${err instanceof Error ? err.message : err}`);
         return { entries: {} };
     }
 }
@@ -69,7 +75,12 @@ function writeManifest(pluginRoot, manifest) {
     fs.writeFileSync(tmp, JSON.stringify(manifest, null, 2), "utf8");
     fs.renameSync(tmp, p);
 }
+// Agents/skills/CLAUDE.md are KB-scale; anything near 1 MB is malformed or hostile
+const MAX_CONTENT_BYTES = 1024 * 1024;
 function validateContent(content) {
+    if (Buffer.byteLength(content, "utf8") > MAX_CONTENT_BYTES) {
+        return { ok: false, error: `Proposed content exceeds ${MAX_CONTENT_BYTES} bytes` };
+    }
     const hasFrontmatter = /^---\s*\n[\s\S]*?\n---/.test(content);
     if (hasFrontmatter) {
         const fm = (0, utils_js_1.parseFrontmatter)(content);

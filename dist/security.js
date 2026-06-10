@@ -45,29 +45,32 @@ const path = __importStar(require("path"));
 const crypto = __importStar(require("crypto"));
 // Patterns for common secret formats — best-effort, not a guarantee.
 // Regexes are constructed per-call to avoid shared lastIndex state on /g patterns.
-function buildSecretPatterns() {
-    return [
-        // Generic API keys: alphanumeric + special, 20+ chars after key-like prefix
-        /\b(sk|pk|api[_-]?key|token|secret|auth|bearer)[_-]?[\w\-]{16,}/gi,
-        // KEY=VALUE .env style (upper and lower case)
-        /^[A-Za-z_][A-Za-z0-9_]{2,}=\S{8,}/gm,
-        // Bearer tokens in headers
-        /bearer\s+[\w\-._~+/]+=*/gi,
-        // AWS-style keys
-        /\b(AKIA|ASIA|AROA)[A-Z0-9]{16}\b/g,
-        // GitHub tokens (PATs, OAuth, server-to-server)
-        /\bgh[pousr]_[A-Za-z0-9_]{36,}\b/g,
-        // Slack tokens
-        /\bxox[bpas]-[\w\-]{10,}\b/g,
-        // npm auth tokens
-        /\/\/registry\.npmjs\.org\/:_authToken=\S+/g,
-        // PEM private key blocks
-        /-----BEGIN [A-Z ]+ PRIVATE KEY-----[\s\S]*?-----END [A-Z ]+ PRIVATE KEY-----/g,
-    ];
-}
+// Module-level: only ever used via String.replace (which resets lastIndex), so sharing is safe
+const SECRET_PATTERNS = [
+    // Generic API keys: alphanumeric + special, 20+ chars after key-like prefix
+    /\b(sk|pk|api[_-]?key|token|secret|auth|bearer)[_-]?[\w\-]{16,}/gi,
+    // KEY=VALUE .env style (upper and lower case)
+    /^[A-Za-z_][A-Za-z0-9_]{2,}=\S{8,}/gm,
+    // Bearer tokens in headers
+    /bearer\s+[\w\-._~+/]+=*/gi,
+    // AWS-style keys
+    /\b(AKIA|ASIA|AROA)[A-Z0-9]{16}\b/g,
+    // GitHub tokens (PATs, OAuth, server-to-server)
+    /\bgh[pousr]_[A-Za-z0-9_]{36,}\b/g,
+    // Slack tokens
+    /\bxox[bpas]-[\w\-]{10,}\b/g,
+    // npm auth tokens
+    /\/\/registry\.npmjs\.org\/:_authToken=\S+/g,
+    // Google API keys
+    /\bAIza[0-9A-Za-z_\-]{35}\b/g,
+    // JWTs (header segment always starts "eyJ"; anchored prefix avoids false positives)
+    /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g,
+    // PEM private key blocks
+    /-----BEGIN [A-Z ]+ PRIVATE KEY-----[\s\S]*?-----END [A-Z ]+ PRIVATE KEY-----/g,
+];
 function scrubSecrets(text) {
     let result = text;
-    for (const pattern of buildSecretPatterns()) {
+    for (const pattern of SECRET_PATTERNS) {
         result = result.replace(pattern, "[REDACTED]");
     }
     return result;
