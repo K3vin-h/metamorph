@@ -33,6 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
+const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const os = __importStar(require("os"));
 const runtime_js_1 = require("./runtime.js");
@@ -112,41 +113,28 @@ async function runImproveList() {
     const { listImprovements } = await Promise.resolve().then(() => __importStar(require("./improve/improver.js")));
     console.log(listImprovements(DATA_ROOT));
 }
-async function runImproveStats() {
-    const fs = await Promise.resolve().then(() => __importStar(require("fs")));
-    const path = await Promise.resolve().then(() => __importStar(require("path")));
+// Shared guarded read of analysis.json — returns null (after printing why) when unusable
+function readAnalysis() {
     const analysisPath = path.join(DATA_ROOT, "data", "analysis.json");
     if (!fs.existsSync(analysisPath)) {
         console.log("No session data yet. Run a session to begin.");
-        return;
+        return null;
     }
-    const analysis = JSON.parse(fs.readFileSync(analysisPath, "utf8"));
-    const { printImproveStats } = await Promise.resolve().then(() => __importStar(require("./improve/improveCli.js")));
-    printImproveStats(DATA_ROOT, analysis);
+    try {
+        return JSON.parse(fs.readFileSync(analysisPath, "utf8"));
+    }
+    catch (err) {
+        logError("read-analysis", err);
+        console.log("analysis.json is corrupted — run a session to regenerate it.");
+        return null;
+    }
 }
-async function runImproveTargets() {
-    const fs = await Promise.resolve().then(() => __importStar(require("fs")));
-    const path = await Promise.resolve().then(() => __importStar(require("path")));
-    const analysisPath = path.join(DATA_ROOT, "data", "analysis.json");
-    if (!fs.existsSync(analysisPath)) {
-        console.log("No session data yet. Run a session to begin.");
+async function runImproveCli(printerName) {
+    const analysis = readAnalysis();
+    if (!analysis)
         return;
-    }
-    const analysis = JSON.parse(fs.readFileSync(analysisPath, "utf8"));
-    const { printImproveTargets } = await Promise.resolve().then(() => __importStar(require("./improve/improveCli.js")));
-    printImproveTargets(DATA_ROOT, analysis);
-}
-async function runImproveTargetsActionable() {
-    const fs = await Promise.resolve().then(() => __importStar(require("fs")));
-    const path = await Promise.resolve().then(() => __importStar(require("path")));
-    const analysisPath = path.join(DATA_ROOT, "data", "analysis.json");
-    if (!fs.existsSync(analysisPath)) {
-        console.log("No session data yet. Run a session to begin.");
-        return;
-    }
-    const analysis = JSON.parse(fs.readFileSync(analysisPath, "utf8"));
-    const { printImproveTargetsActionable } = await Promise.resolve().then(() => __importStar(require("./improve/improveCli.js")));
-    printImproveTargetsActionable(DATA_ROOT, analysis);
+    const cli = await Promise.resolve().then(() => __importStar(require("./improve/improveCli.js")));
+    cli[printerName](DATA_ROOT, analysis);
 }
 async function runReportRefresh() {
     const { refreshReportFromDisk } = await Promise.resolve().then(() => __importStar(require("./report/reportMd.js")));
@@ -157,7 +145,6 @@ async function runReportRefresh() {
     console.log("No analysis.json found. Run a session first.");
 }
 async function runReportPrint() {
-    const fs = await Promise.resolve().then(() => __importStar(require("fs")));
     const { refreshReportFromDisk } = await Promise.resolve().then(() => __importStar(require("./report/reportMd.js")));
     if (!refreshReportFromDisk(DATA_ROOT)) {
         console.log("No analysis.json found. Run a session first.");
@@ -167,18 +154,6 @@ async function runReportPrint() {
     console.log(`Report file: [report.md](${reportPath})`);
     console.log("");
     console.log(fs.readFileSync(reportPath, "utf8"));
-}
-async function runImproveStatus() {
-    const fs = await Promise.resolve().then(() => __importStar(require("fs")));
-    const path = await Promise.resolve().then(() => __importStar(require("path")));
-    const analysisPath = path.join(DATA_ROOT, "data", "analysis.json");
-    if (!fs.existsSync(analysisPath)) {
-        console.log("No session data yet. Run a session to begin.");
-        return;
-    }
-    const analysis = JSON.parse(fs.readFileSync(analysisPath, "utf8"));
-    const { printImproveStatus } = await Promise.resolve().then(() => __importStar(require("./improve/improveCli.js")));
-    printImproveStatus(DATA_ROOT, analysis);
 }
 async function runRollbackList() {
     const { rollbackList } = await Promise.resolve().then(() => __importStar(require("./rollback/rollback.js")));
@@ -245,16 +220,16 @@ async function main() {
                 await runImproveList();
                 break;
             case "improve-stats":
-                await runImproveStats();
+                await runImproveCli("printImproveStats");
                 break;
             case "improve-targets":
-                await runImproveTargets();
+                await runImproveCli("printImproveTargets");
                 break;
             case "improve-targets-actionable":
-                await runImproveTargetsActionable();
+                await runImproveCli("printImproveTargetsActionable");
                 break;
             case "improve-status":
-                await runImproveStatus();
+                await runImproveCli("printImproveStatus");
                 break;
             case "report-refresh":
                 await runReportRefresh();
