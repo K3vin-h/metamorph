@@ -75,30 +75,20 @@ async function sessionStart(pluginRoot, _claudeRoot) {
         // Non-fatal — session end will retry report generation
     }
     const config = (0, config_js_1.loadConfig)(pluginRoot);
-    const { sessionCount, totals, agents, skills } = analysis;
-    const warmupMet = sessionCount >= config.warmupSessions;
-    const topFlags = [...agents, ...skills]
-        .filter((t) => t.flags.length > 0)
-        .sort((a, b) => a.score - b.score)
-        .slice(0, 3);
-    const lines = ["─".repeat(50), "metamorph"];
-    if (!warmupMet) {
+    const { sessionCount, agents, skills } = analysis;
+    const reportPath = path.join(pluginRoot, "report.md");
+    // Compact 2-line status — this output lands in every session's context, so keep it short.
+    // The full dashboard lives in /metamorph-report.
+    if (sessionCount < config.warmupSessions) {
         const remaining = config.warmupSessions - sessionCount;
-        lines.push(`  warming up: ${sessionCount}/${config.warmupSessions} — ${remaining} more session${remaining === 1 ? "" : "s"} until /metamorph unlocks`);
+        console.log(`metamorph: warming up ${sessionCount}/${config.warmupSessions} — ${remaining} more session${remaining === 1 ? "" : "s"} until /metamorph unlocks\nreport: ${reportPath}`);
+        return;
     }
-    else {
-        lines.push(`  sessions: ${sessionCount} | agents: ${totals.agentRuns} runs | skills: ${totals.skillLoads} loads`);
-        lines.push("  run /metamorph to improve · /metamorph --status for details");
-    }
-    if (topFlags.length > 0) {
-        lines.push("  top flags:");
-        for (const t of topFlags) {
-            const flag = t.flags[0];
-            lines.push(`    ${t.id} (score ${t.score}) — ${(0, flagsShort_js_1.shortFlag)(t.flags)} [${flag.confidence}]`);
-        }
-    }
-    lines.push(`  report: ${path.join(pluginRoot, "report.md")}`);
-    lines.push("─".repeat(50));
-    console.log(lines.join("\n"));
+    const flagged = [...agents, ...skills]
+        .filter((t) => t.flags.length > 0)
+        .sort((a, b) => a.score - b.score);
+    const top = flagged[0];
+    const topPart = top ? ` · top: ${top.id} (${top.score}, ${(0, flagsShort_js_1.shortFlag)(top.flags)})` : "";
+    console.log(`metamorph: ${sessionCount} sessions · ${flagged.length} flagged${topPart}\nreport: ${reportPath} → /metamorph`);
 }
 //# sourceMappingURL=sessionStart.js.map

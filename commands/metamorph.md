@@ -21,6 +21,9 @@ Improve your agents, skills, and CLAUDE.md based on your real coding habits.
 
 You are the metamorph improvement orchestrator. **Speed and token efficiency are critical.**
 
+Path shorthand — substitute literally in every command/path below:
+`$ROOT` = `${CURSOR_PLUGIN_ROOT:-${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}` · `$DATA` = `${CLAUDE_PLUGIN_DATA:-${PLUGIN_DATA:-$ROOT}}`
+
 - Do **not** read `analysis.json` or target agent/skill files — use CLI output and prepared context files only.
 - Do **not** dispatch subagents for skipped targets (inactive targets are auto-skipped unless forced).
 - Dispatch **all** diff subagents in **one** parallel batch (single assistant turn).
@@ -31,7 +34,7 @@ You are the metamorph improvement orchestrator. **Speed and token efficiency are
 **Step 1 — Stats (CLI only).**
 
 ```bash
-node "${CURSOR_PLUGIN_ROOT:-${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/dist/index.js" improve-stats
+node "$ROOT/dist/index.js" improve-stats
 ```
 
 If output is `No session data yet`, stop.
@@ -39,7 +42,7 @@ If output is `No session data yet`, stop.
 If `--status`:
 
 ```bash
-node "${CURSOR_PLUGIN_ROOT:-${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/dist/index.js" improve-status
+node "$ROOT/dist/index.js" improve-status
 ```
 
 Stop after printing (includes recommended target IDs).
@@ -49,12 +52,12 @@ Stop after printing (includes recommended target IDs).
 Refresh the dashboard file:
 
 ```bash
-node "${CURSOR_PLUGIN_ROOT:-${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/dist/index.js" report-refresh
+node "$ROOT/dist/index.js" report-refresh
 ```
 
 If output is `No analysis.json found`, print that and stop.
 
-Read `${CLAUDE_PLUGIN_DATA:-${PLUGIN_DATA:-${CURSOR_PLUGIN_ROOT:-${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}}}/report.md` and print its **full contents verbatim** under:
+Read `$DATA/report.md` and print its **full contents verbatim** under:
 
 ```
 ## Report
@@ -69,7 +72,7 @@ Rules:
 **Step 3 — Suggestions tab (CLI only).**
 
 ```bash
-node "${CURSOR_PLUGIN_ROOT:-${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/dist/index.js" improve-targets-actionable
+node "$ROOT/dist/index.js" improve-targets-actionable
 ```
 
 Print this output verbatim under:
@@ -99,7 +102,7 @@ Check `config.write.targets.claudeMd`: use configured scope, or skip if `false`,
 **Step 5 — Batch prepare (one command, one runId).**
 
 ```bash
-node "${CURSOR_PLUGIN_ROOT:-${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/dist/index.js" prepare-improve-batch id1 id2 id3
+node "$ROOT/dist/index.js" prepare-improve-batch id1 id2 id3
 ```
 
 Parse JSON: `runId`, `prepared[]` (`id`, `contextPath`, `suggestionPath`), `skipped[]`.
@@ -143,7 +146,7 @@ Accept which changes? "all" | IDs | "none"
 For each accepted non-empty diff:
 
 ```bash
-node "${CURSOR_PLUGIN_ROOT:-${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/dist/index.js" improve-approve '<runId>-<id>'
+node "$ROOT/dist/index.js" improve-approve '<runId>-<id>'
 ```
 
 Print backup path or error. On success: `To undo: /metamorph-rollback --file <path>`

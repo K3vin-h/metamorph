@@ -18,14 +18,17 @@ Interactive configuration wizard. Re-run any time to change settings.
 
 You are the metamorph setup wizard. Walk the user through each setting interactively.
 
+Path shorthand — substitute literally in every command/path below:
+`$ROOT` = `${CURSOR_PLUGIN_ROOT:-${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}` · `$DATA` = `${CLAUDE_PLUGIN_DATA:-${PLUGIN_DATA:-$ROOT}}`
+
 Print a welcome banner:
 ```
 metamorph setup wizard
-Settings are saved to ${CLAUDE_PLUGIN_DATA:-${PLUGIN_DATA:-${CURSOR_PLUGIN_ROOT:-${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}}}/config.jsonc
+Settings are saved to $DATA/config.jsonc
 Press Enter to keep the current value [shown in brackets]
 ```
 
-Read the current config from `${CLAUDE_PLUGIN_DATA:-${PLUGIN_DATA:-${CURSOR_PLUGIN_ROOT:-${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}}}/config.jsonc` (fall back to defaults if missing/invalid).
+Read the current config from `$DATA/config.jsonc` (fall back to defaults if missing/invalid).
 
 Ask each question in order. For each, show the current value in brackets. Accept Enter to keep it.
 
@@ -84,7 +87,7 @@ After all questions, show a summary diff of changes and ask:
 Save these settings? [Y/n] 
 ```
 
-On confirm: write the updated config to `${CLAUDE_PLUGIN_DATA:-${PLUGIN_DATA:-${CURSOR_PLUGIN_ROOT:-${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}}}/config.jsonc` using `node "${CURSOR_PLUGIN_ROOT:-${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/dist/index.js" config-write '<json>'`.
+On confirm: write the updated config to `$DATA/config.jsonc` using `node "$ROOT/dist/index.js" config-write '<json>'`.
 
 **7. Cross-tool installation** (optional)
 
@@ -99,19 +102,19 @@ Current: [skip] >
 
 For option 1 or 3:
 ```bash
-node "${CURSOR_PLUGIN_ROOT:-${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/dist/index.js" setup-cursor
+node "$ROOT/dist/index.js" setup-cursor
 ```
 
 For option 2 or 3:
 ```bash
-node "${CURSOR_PLUGIN_ROOT:-${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}/dist/index.js" setup-codex
+node "$ROOT/dist/index.js" setup-codex
 ```
 
 Print the command output verbatim.
 
 Print confirmation:
 ```
-Settings saved to ${CLAUDE_PLUGIN_DATA:-${PLUGIN_DATA:-${CURSOR_PLUGIN_ROOT:-${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}}}}/config.jsonc
+Settings saved to $DATA/config.jsonc
 Run /metamorph to see your dashboard.
 ```
 
