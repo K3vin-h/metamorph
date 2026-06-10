@@ -6,5 +6,13 @@
   "engines": {
     "node": ">=18.0.0"
   },
+  "scripts": {
+    "lint": "node scripts/check-syntax.mjs",
+    "validate": "node scripts/validate-manifests.mjs",
+    "test": "node --test tests/*.test.js",
+    "test:unit": "node --test tests/scoring.test.js tests/config.test.js tests/denyReadGlob.test.js tests/rollback.test.js tests/transcriptMalformed.test.js tests/diffValidation.test.js tests/security.test.js",
+    "test:package": "node --test tests/packageValidation.test.js",
+    "test:smoke": "node --test tests/pluginStructure.test.js"
+  },
   "license": "MIT"
 }

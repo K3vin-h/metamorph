@@ -2,11 +2,21 @@
 
 **Version 1.2.7**
 
-metamorph is a plugin for **Claude Code**, **Cursor**, and **Codex** that studies how you actually use your **agents**, **skills**, and **CLAUDE.md** files. It builds a text **dashboard**, scores each target, and proposes small file edits as **diffs** (proposed changes). Nothing is written to disk until you approve it.
+metamorph is a **local-first AI-agent observability and improvement tool** for **Claude Code**, **Cursor**, and **Codex**. It observes how you actually use your **agents**, **skills**, and **CLAUDE.md** files, builds a text **dashboard** that scores each target, and proposes small file edits as **diffs** you review. Suggest-only with one-level rollback, no telemetry, and tokens spent only when you ask for an improvement.
 
-**Suggest-only by design:** metamorph never auto-applies edits. You review every diff first.
+**Local-first & private:** observation, scoring, and the dashboard run entirely on your machine — no network calls, no telemetry. See [docs/privacy-model.md](docs/privacy-model.md).
 
-**Runtime-only repo:** `main` contains the files users install and run. Source, tests, source maps, and build-only files are intentionally not shipped in this branch.
+**Suggest-only by design:** metamorph never auto-applies edits. You review every diff first, every applied change is backed up, and `/metamorph-rollback` undoes it.
+
+**Runtime-only repo:** `main` contains the files users install and run, plus `tests/` and CI that validate the shipped `dist/` artifact. TypeScript source, source maps, and build-only files are intentionally not shipped in this branch.
+
+**Documentation:**
+
+- [docs/architecture.md](docs/architecture.md) — two-layer design and data flow
+- [docs/scoring-model.md](docs/scoring-model.md) — how scores and flags are computed
+- [docs/privacy-model.md](docs/privacy-model.md) — read modes, scrubbing, deny globs
+- [docs/plugin-runtime.md](docs/plugin-runtime.md) — cross-host packaging and data persistence
+- [docs/security-review.md](docs/security-review.md) — threat model and controls
 
 ---
 
@@ -62,7 +72,7 @@ metamorph does **not** run continuously in the background, serve an HTML dashboa
 
 | Hook | When | What it does |
 |------|------|--------------|
-| **SessionStart** | Session opens | Refreshes `report.md`; prints warm-up status and top flags |
+| **SessionStart** | Session opens | Refreshes `report.md`; prints a compact 2-line status (session count, flagged count, top target) |
 | **SessionEnd** | Session closes | Parses new transcript data; updates scores when new sessions are found; refreshes the report and style profile only if new data was ingested |
 
 Hook timeouts: SessionStart **10s**, SessionEnd **60s**. Errors go to `data/hook-errors.log` and do not prevent Claude Code from closing normally.
