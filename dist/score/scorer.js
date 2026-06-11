@@ -39,14 +39,15 @@ function computeSectionScore(sections, _rawContent, usedTools) {
             deadSections.push(section);
         }
     }
-    const score = sections.length > 0 ? (hitCount / sections.length) * 100 : 100;
+    const score = (hitCount / sections.length) * 100;
     return { score, deadSections };
 }
 function scoreTarget(data, totals, config, kind) {
     const { id, path, invocations, declaredTools, usedTools, sections, rawContent, loads, applied, mistakePatterns } = data;
     const readMode = config.read.transcripts;
     // Invocation score (40%)
-    const totalRuns = kind === "agent" ? Math.max(1, totals.agentRuns) : Math.max(1, totals.skillLoads);
+    // ?? 0 guards corrupted analysis input — Math.max(1, undefined) is NaN
+    const totalRuns = kind === "agent" ? Math.max(1, totals.agentRuns ?? 0) : Math.max(1, totals.skillLoads ?? 0);
     const invocationScore = Math.min(100, (invocations / totalRuns) * 100 * 5); // *5 so ~20% usage = 100
     // Tool usage score (30%)
     const toolScore = declaredTools.length === 0

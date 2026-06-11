@@ -74,7 +74,9 @@ function upsertCodexMarketplace(marketplaceDir) {
     else {
         marketplace.plugins.push(entry);
     }
-    fs.writeFileSync(marketplacePath, `${JSON.stringify(marketplace, null, 2)}\n`, "utf8");
+    const tmp = marketplacePath + ".tmp";
+    fs.writeFileSync(tmp, `${JSON.stringify(marketplace, null, 2)}\n`, "utf8");
+    fs.renameSync(tmp, marketplacePath);
 }
 function runSetupCodex(pluginRoot) {
     const marketplaceDir = path.join(os.homedir(), ".agents", "plugins");

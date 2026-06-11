@@ -10,7 +10,8 @@ function trim(s) {
     return t.length <= MAX_EXAMPLE_CHARS ? t : t.slice(0, MAX_EXAMPLE_CHARS - 3) + "...";
 }
 function exampleKey(tool, mistake, correction) {
-    return `${tool}::${mistake}::${correction ?? ""}`;
+    // JSON array form — delimiter-proof (":" inside fields can't collide keys)
+    return JSON.stringify([tool, mistake, correction ?? ""]);
 }
 function collectEvents(sessions, pluginRoot) {
     const fromSessions = [];

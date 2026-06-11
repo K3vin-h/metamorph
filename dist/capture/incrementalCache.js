@@ -43,6 +43,7 @@ const transcriptParser_js_1 = require("./transcriptParser.js");
 const hookErrors_js_1 = require("../hookErrors.js");
 const cachePath = (pluginRoot) => path.join(pluginRoot, "data", "profile.json");
 const MAX_CACHE_SESSIONS = 500;
+const MAX_FAILED_SESSIONS = 200;
 function readCache(pluginRoot) {
     const p = cachePath(pluginRoot);
     try {
@@ -52,22 +53,30 @@ function readCache(pluginRoot) {
             failedSessions: raw.failedSessions ?? {},
         };
     }
-    catch {
+    catch (err) {
+        // Keep the corrupt file for forensics; cache self-heals by re-parsing transcripts
+        if (fs.existsSync(p)) {
+            try {
+                fs.renameSync(p, p + ".corrupt");
+                (0, hookErrors_js_1.logHookError)(pluginRoot, "read-profile-cache", err);
+            }
+            catch { /* best-effort */ }
+        }
         return { sessions: {}, failedSessions: {} };
     }
 }
-function trimCache(cache) {
-    const ids = Object.keys(cache.sessions);
-    if (ids.length <= MAX_CACHE_SESSIONS)
+function trimOldest(record, max, timestampOf) {
+    const ids = Object.keys(record);
+    if (ids.length <= max)
         return;
-    const sorted = ids.sort((a, b) => {
-        const ta = cache.sessions[a]?.capturedAt ?? "";
-        const tb = cache.sessions[b]?.capturedAt ?? "";
-        return ta.localeCompare(tb);
-    });
-    for (const id of sorted.slice(0, ids.length - MAX_CACHE_SESSIONS)) {
-        delete cache.sessions[id];
+    const sorted = ids.sort((a, b) => timestampOf(record[a]).localeCompare(timestampOf(record[b])));
+    for (const id of sorted.slice(0, ids.length - max)) {
+        delete record[id];
     }
+}
+function trimCache(cache) {
+    trimOldest(cache.sessions, MAX_CACHE_SESSIONS, (s) => s?.capturedAt ?? "");
+    trimOldest(cache.failedSessions ?? {}, MAX_FAILED_SESSIONS, (f) => f?.skippedAt ?? "");
 }
 function writeCache(pluginRoot, cache) {
     trimCache(cache);
@@ -166,98 +175,76 @@ function findCodexTranscripts(codexRoot, pluginRoot) {
     }
     return results;
 }
+function findSubagentTranscripts(claudeRoot) {
+    const results = [];
+    const projectsDir = path.join(claudeRoot, "projects");
+    if (!fs.existsSync(projectsDir))
+        return results;
+    for (const entry of fs.readdirSync(projectsDir, { withFileTypes: true })) {
+        if (!entry.isDirectory())
+            continue;
+        const subagentDir = path.join(projectsDir, entry.name, "subagents");
+        if (!fs.existsSync(subagentDir))
+            continue;
+        for (const file of fs.readdirSync(subagentDir)) {
+            if (!file.endsWith(".jsonl"))
+                continue;
+            const callId = file.replace(/^agent-/, "").replace(".jsonl", "");
+            results.push({ sessionId: `sub-${callId}`, filePath: path.join(subagentDir, file) });
+        }
+    }
+    return results;
+}
+// Shared parse loop for every transcript source; postProcess runs before the profile is cached
+async function ingestTranscripts(cache, list, config, claudeRoot, pluginRoot, label, postProcess) {
+    let added = 0;
+    for (const { sessionId, filePath } of list) {
+        if (cache.sessions[sessionId] || cache.failedSessions[sessionId])
+            continue;
+        try {
+            const profile = await (0, transcriptParser_js_1.parseTranscript)(filePath, sessionId, config.read.transcripts, config.read.denyGlobs, claudeRoot, pluginRoot);
+            postProcess?.(profile, sessionId);
+            cache.sessions[sessionId] = profile;
+            added++;
+        }
+        catch (err) {
+            recordParseFailure(cache, sessionId, err, pluginRoot, `${label}:${sessionId}`);
+        }
+    }
+    return added;
+}
 async function updateCache(pluginRoot, claudeRoot, currentSessionId) {
     const config = (0, config_js_1.loadConfig)(pluginRoot);
     const cache = readCache(pluginRoot);
     if (!cache.failedSessions)
         cache.failedSessions = {};
     let newSessions = 0;
-    const transcripts = findTranscriptFiles(claudeRoot, pluginRoot);
-    for (const { sessionId, filePath } of transcripts) {
-        if (cache.sessions[sessionId] || cache.failedSessions[sessionId])
-            continue;
-        try {
-            const profile = await (0, transcriptParser_js_1.parseTranscript)(filePath, sessionId, config.read.transcripts, config.read.denyGlobs, claudeRoot, pluginRoot);
-            cache.sessions[sessionId] = profile;
-            newSessions++;
-        }
-        catch (err) {
-            recordParseFailure(cache, sessionId, err, pluginRoot, `parse-transcript:${sessionId}`);
-        }
-    }
+    newSessions += await ingestTranscripts(cache, findTranscriptFiles(claudeRoot, pluginRoot), config, claudeRoot, pluginRoot, "parse-transcript");
     const callIdToAgentType = {};
     for (const profile of Object.values(cache.sessions)) {
         if (!profile || !("agentCallMappings" in profile))
             continue;
         Object.assign(callIdToAgentType, profile.agentCallMappings);
     }
-    const projectsDir = path.join(claudeRoot, "projects");
-    if (fs.existsSync(projectsDir)) {
-        for (const projectDir of fs.readdirSync(projectsDir, { withFileTypes: true })
-            .filter((d) => d.isDirectory())
-            .map((d) => path.join(projectsDir, d.name))) {
-            const subagentDir = path.join(projectDir, "subagents");
-            if (!fs.existsSync(subagentDir))
-                continue;
-            for (const file of fs.readdirSync(subagentDir)) {
-                if (!file.endsWith(".jsonl"))
-                    continue;
-                const callId = file.replace(/^agent-/, "").replace(".jsonl", "");
-                const subSessionId = `sub-${callId}`;
-                if (cache.sessions[subSessionId] || cache.failedSessions[subSessionId])
-                    continue;
-                try {
-                    const profile = await (0, transcriptParser_js_1.parseTranscript)(path.join(subagentDir, file), subSessionId, config.read.transcripts, config.read.denyGlobs, claudeRoot, pluginRoot);
-                    const agentType = callIdToAgentType[callId];
-                    if (agentType) {
-                        for (const ev of profile.toolCalls) {
-                            ev.agentId = agentType;
-                        }
-                        profile.agentInvocations[agentType] = (profile.agentInvocations[agentType] ?? 0) + 1;
-                    }
-                    cache.sessions[subSessionId] = profile;
-                    newSessions++;
-                }
-                catch (err) {
-                    recordParseFailure(cache, subSessionId, err, pluginRoot, `parse-subagent:${subSessionId}`);
-                }
-            }
+    newSessions += await ingestTranscripts(cache, findSubagentTranscripts(claudeRoot), config, claudeRoot, pluginRoot, "parse-subagent", (profile, sessionId) => {
+        const agentType = callIdToAgentType[sessionId.slice("sub-".length)];
+        if (!agentType)
+            return;
+        for (const ev of profile.toolCalls) {
+            ev.agentId = agentType;
         }
-    }
-    // Cursor transcripts
+        profile.agentInvocations[agentType] = (profile.agentInvocations[agentType] ?? 0) + 1;
+    });
     if (config.read.trackCursor) {
         const cursorRoot = config.read.cursorRoot ?? path.join(os.homedir(), ".cursor");
         if (fs.existsSync(cursorRoot)) {
-            for (const { sessionId, filePath } of findCursorTranscripts(cursorRoot, pluginRoot)) {
-                if (cache.sessions[sessionId] || cache.failedSessions?.[sessionId])
-                    continue;
-                try {
-                    const profile = await (0, transcriptParser_js_1.parseTranscript)(filePath, sessionId, config.read.transcripts, config.read.denyGlobs, claudeRoot, pluginRoot);
-                    cache.sessions[sessionId] = profile;
-                    newSessions++;
-                }
-                catch (err) {
-                    recordParseFailure(cache, sessionId, err, pluginRoot, `parse-cursor:${sessionId}`);
-                }
-            }
+            newSessions += await ingestTranscripts(cache, findCursorTranscripts(cursorRoot, pluginRoot), config, claudeRoot, pluginRoot, "parse-cursor");
         }
     }
-    // Codex transcripts
     if (config.read.trackCodex) {
         const codexRoot = config.read.codexRoot ?? path.join(os.homedir(), ".codex");
         if (fs.existsSync(codexRoot)) {
-            for (const { sessionId, filePath } of findCodexTranscripts(codexRoot, pluginRoot)) {
-                if (cache.sessions[sessionId] || cache.failedSessions?.[sessionId])
-                    continue;
-                try {
-                    const profile = await (0, transcriptParser_js_1.parseTranscript)(filePath, sessionId, config.read.transcripts, config.read.denyGlobs, claudeRoot, pluginRoot);
-                    cache.sessions[sessionId] = profile;
-                    newSessions++;
-                }
-                catch (err) {
-                    recordParseFailure(cache, sessionId, err, pluginRoot, `parse-codex:${sessionId}`);
-                }
-            }
+            newSessions += await ingestTranscripts(cache, findCodexTranscripts(codexRoot, pluginRoot), config, claudeRoot, pluginRoot, "parse-codex");
         }
     }
     if (newSessions > 0) {

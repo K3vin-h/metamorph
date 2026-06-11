@@ -37,6 +37,7 @@ exports.recordSuggestionRejected = recordSuggestionRejected;
 exports.readPersistedMistakeEvents = readPersistedMistakeEvents;
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
+const security_js_1 = require("./security.js");
 const feedbackPath = (pluginRoot) => path.join(pluginRoot, "data", "mistake-feedback.jsonl");
 const MAX_ENTRIES = 100;
 function recordSuggestionRejected(pluginRoot, targetKind, targetId, mistakeSummary) {
@@ -47,7 +48,7 @@ function recordSuggestionRejected(pluginRoot, targetKind, targetId, mistakeSumma
         targetId,
         toolName: "metamorph",
         kind: "suggestion-rejected",
-        mistakeSummary: mistakeSummary.slice(0, 80),
+        mistakeSummary: (0, security_js_1.scrubSecrets)(mistakeSummary).slice(0, 80),
         confidence: "high",
     };
     const p = feedbackPath(pluginRoot);

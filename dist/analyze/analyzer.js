@@ -157,14 +157,21 @@ function aggregateProfiles(sessions) {
     let totalAgentRuns = 0;
     let totalSkillLoads = 0;
     let skippedTranscriptLines = 0;
+    const isCountRecord = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
+    const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
     for (const session of Object.values(sessions)) {
-        if (!session?.toolCalls)
+        // Skip malformed cache entries instead of crashing the whole analysis
+        if (!Array.isArray(session?.toolCalls) ||
+            !isCountRecord(session.agentInvocations) ||
+            !isCountRecord(session.skillLoads) ||
+            !isCountRecord(session.skillApplied) ||
+            !isCountRecord(session.fileExtensions))
             continue;
         totalToolCalls += session.toolCalls.length;
-        skippedTranscriptLines += session.skippedLines ?? 0;
+        skippedTranscriptLines += num(session.skippedLines);
         for (const [agentId, count] of Object.entries(session.agentInvocations)) {
-            agentInvocations[agentId] = (agentInvocations[agentId] ?? 0) + count;
-            totalAgentRuns += count;
+            agentInvocations[agentId] = (agentInvocations[agentId] ?? 0) + num(count);
+            totalAgentRuns += num(count);
         }
         for (const ev of session.toolCalls) {
             if (ev.agentId) {
@@ -174,14 +181,14 @@ function aggregateProfiles(sessions) {
             }
         }
         for (const [skillId, count] of Object.entries(session.skillLoads)) {
-            skillLoads[skillId] = (skillLoads[skillId] ?? 0) + count;
-            totalSkillLoads += count;
+            skillLoads[skillId] = (skillLoads[skillId] ?? 0) + num(count);
+            totalSkillLoads += num(count);
         }
         for (const [skillId, count] of Object.entries(session.skillApplied)) {
-            skillApplied[skillId] = (skillApplied[skillId] ?? 0) + count;
+            skillApplied[skillId] = (skillApplied[skillId] ?? 0) + num(count);
         }
         for (const [ext, count] of Object.entries(session.fileExtensions)) {
-            fileExtensions[ext] = (fileExtensions[ext] ?? 0) + count;
+            fileExtensions[ext] = (fileExtensions[ext] ?? 0) + num(count);
         }
     }
     return {

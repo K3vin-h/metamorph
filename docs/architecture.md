@@ -1,137 +1,86 @@
 # Architecture
 
-This page explains **how metamorph is built and how its pieces fit together**. If you've never seen this project before, start here.
+How metamorph is structured and how data flows through it. Start here if you're new to the codebase.
 
-## First, what is metamorph?
+## What metamorph does
 
-When you code with an AI assistant like **Claude Code**, **Cursor**, or **Codex**, you give it helpers:
+Working in Claude Code, Cursor, or Codex, you accumulate three kinds of configuration:
 
-- **Agents** — specialized assistants you can call on for a job (for example, a `code-reviewer` agent or an `architect` agent).
-- **Skills** — instruction files the AI loads when it needs to do a certain kind of task (for example, a "write tests first" skill).
-- **CLAUDE.md** — a file of standing instructions that tells the AI how you like to work.
+- **Agents** — specialized assistant definitions you invoke for a job (`code-reviewer`, `reseacher`).
+- **Skills** — instruction files the assistant loads for a particular kind of task.
+- **CLAUDE.md** — standing instructions that shape how the general coding assistant works.
 
-Over time some of these helpers get used a lot, some get used in the wrong way, and some never get used at all. The problem: you usually can't *see* any of that.
+Some of these get used constantly, some get used wrong, and some are never used at all — and none of it is visible to you. The metamorph plugin measures how you actually use this configuration and proposes targeted edits. Two constraints define it:
 
-**metamorph is a tool that watches how you actually use those helpers, then helps you improve them.** Two ideas define it:
+- **Local-first** — all observation and scoring is done locally on your machine. No data leaves your local machine.
+- **Suggest-only** — metamorph never edits files on its own. It proposes a changes; the changes only get applied once you review and approve them.
 
-- **Local-first** — everything that watches and measures runs on *your* computer. Nothing is uploaded to the internet. There is no tracking.
-- **Suggest-only** — metamorph never edits your files behind your back. It can *propose* a change, but the change only happens after you look at it and click approve.
+## Two layers
 
-> **Jargon check**
-> - **Token** = the unit AI usage is measured (and billed) in. "Uses tokens" means "talks to the AI and costs something." "Zero tokens" means "no AI was involved, so it was free."
-> - **Diff** = a before/after view of a file that shows exactly which lines would change. Like "track changes" in a word processor.
-> - **Hook** = a small script your AI tool runs automatically at a set moment (such as when a work session starts or ends). A hook is plain code — no AI.
+Metamorph contains two different workflows that are run in sequence:
 
-## The big picture: two layers
+- **Workflow 1 — the watcher.** Runs automatically in the background. Zero tokens, no AI. It observes and scores the usage of the agents, skills, and CLAUDE.md files.
+- **Workflow 2 — the improver.** Runs only when you type `/metamorph`. Uses tokens — this is the step that asks the model to draft an improvement.
 
-metamorph is split into two layers that do very different things.
-
-- **Layer 1 — the watcher.** Runs automatically in the background. Uses **zero tokens** (no AI). Its job is to observe and measure.
-- **Layer 2 — the improver.** Runs only when *you* type `/metamorph`. Uses tokens (this is the part that asks the AI to draft an improvement).
-
-Here is the whole flow at a glance. Read it top to bottom:
-
-```
-                          ┌─────────────────────────────────────────────┐
-   You finish working     │  LAYER 1 — The watcher (automatic, free)     │
-   ───────────►  hooks/hooks.json ──► dist/hooks/sessionEnd.js           │
-                          │      │   (runs when a session ends)          │
-                          │      ▼                                       │
-                          │  dist/capture/*  → read the session record,  │
-                          │   note which tools/agents/skills were used   │
-                          │      │                                       │
-                          │      ▼                                       │
-                          │  dist/analyze/analyzer.js → add it all up    │
-                          │      │                                       │
-                          │      ▼                                       │
-                          │  dist/score/scorer.js → give each helper a   │
-                          │   score from 0 to 100                        │
-                          │      │                                       │
-                          │      ▼                                       │
-                          │  analysis.json (the saved numbers)           │
-                          │      +                                       │
-                          │  dist/report/reportMd.js → report.md         │
-                          │   (the human-readable dashboard)             │
-                          └─────────────────────────────────────────────┘
-                                         │
-                                         │  You type /metamorph
-                                         ▼
-                          ┌─────────────────────────────────────────────┐
-                          │  LAYER 2 — The improver (on demand, uses AI) │
-                          │  dist/improve/improver.js                    │
-                          │   → carefully cleans the relevant file       │
-                          │     content (remove secrets, neutralize      │
-                          │     anything sketchy), saves it as a safe    │
-                          │     "context" file                           │
-                          │      │                                       │
-                          │      ▼  The AI reads that and writes a draft  │
-                          │     change as a .diff (NOT applied yet)       │
-                          │      │                                       │
-                          │      ▼                                       │
-                          │  You run /metamorph-improve and approve      │
-                          │      │                                       │
-                          │      ▼                                       │
-                          │  dist/rollback/writer.js → check the change, │
-                          │   back up the old file, then write the new   │
-                          │   one. (Now it can be undone.)               │
-                          └─────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+  A[Session Ends] --> B[Watcher]
+  B --> C[Capture]
+  C --> D[Analyze]
+  D --> E[Score]
+  E --> F[Report]
+  F --> G[Improve]
+  G --> H[Approve or reject]
+  H --> I[Writer]
+  I --> J[Done]
 ```
 
-> **What is `dist/`?** It's the folder of ready-to-run program files. (`dist` is short for "distribution.") The project is written in TypeScript and then *compiled* into the plain JavaScript you see in `dist/`. That compiled code is what actually runs on your machine.
+> `dist/` holds the compiled, ready-to-run JavaScript. The source is TypeScript, compiled down to the plain JS that ships and executes on your machine.
 
-## Layer 1 — the watcher (automatic, zero tokens, no AI)
+## Workflow 1 — the watcher (automatic, zero tokens)
 
-This layer turns "stuff that happened while you worked" into "numbers and a report." It is just plain code reading files — **the AI is never involved here**, which is why it's free.
+Workflow 1 turns session activity into scores and a report. It is plain code reading files; the model is never involved, which is why it's free.
 
-It starts from a **hook**. The file `hooks/hooks.json` tells your AI tool: "when a session **starts** or **ends**, run `dist/index.js`." When a session ends, Layer 1 runs these four steps:
+It begins with a hook. `hooks/hooks.json` registers `dist/index.js` to run on session start and end. On session end, Workflow 1 runs four steps:
 
-1. **Capture** — folder `dist/capture/`
-   Your AI tool keeps a **transcript**: a log file of everything that happened in the session (each line is one event). `transcriptParser.js` reads that log one line at a time and notes which tools, agents, and skills were used.
-   - Robustness detail: if a line in the log is broken/garbled, the parser just counts it (in a number called `skippedLines`) and moves on. One bad line never crashes the whole thing.
-   - Helpers here also notice repeated **mistakes** (and the corrections that followed) and remember which sessions were already read so it doesn't redo work (`incrementalCache.js`).
+1. **Capture** — `dist/capture/`
+   Your tool records a transcript: a log of every session event, one per line. `transcriptParser.js` reads it line by line and records which tools, agents, and skills were used. A malformed line is counted in `skippedLines` and skipped — one bad line never crashes the parse. Helpers here also detect repeated mistakes and their corrections, and track which sessions were already processed (`incrementalCache.js`) to avoid redundant work.
 
 2. **Analyze** — `dist/analyze/analyzer.js`
-   Combines the captured events from *all* your sessions into per-helper totals: how many times each agent ran, how many times each skill loaded, which file types you touched, and so on.
+   Combines events across all sessions into per-target totals: agent runs, skill loads, file types touched, and so on.
 
 3. **Score** — `dist/score/scorer.js`
-   Turns those totals into a single **score from 0 to 100** for each helper, and attaches short **flags** (labels like "never used" or "frequently used"). The full formula lives in [scoring-model.md](scoring-model.md).
+   Converts totals into a 0–100 score per target and attaches flags. Full formula in [scoring-model.md](scoring-model.md).
 
 4. **Report** — `dist/report/reportMd.js`
-   Writes two files:
-   - `analysis.json` — the raw numbers, meant for the program to read.
-   - `report.md` — the **dashboard**, meant for *you* to read. Running `/metamorph-report` shows it and gives you a clickable link.
+   Writes two files: `analysis.json` (raw numbers, for the program) and `report.md` (the dashboard, for you). `/metamorph-report` displays it with a clickable link.
 
-## Layer 2 — the improver (on demand, uses tokens / AI)
+## Workflow 2 — the improver (on demand, uses tokens)
 
-This layer only runs when you type `/metamorph`. This is the one place metamorph talks to the AI, so it's the only place that costs tokens.
+Workflow 2 runs only when you type `/metamorph`. It is the one place metamorph calls the model, and uses tokens.
 
 1. **Prepare** — `dist/improve/improver.js` (`prepareImproveBatch`)
-   For each helper you chose to improve, metamorph reads that helper's file and then **sanitizes** it before showing it to the AI:
-   - removes anything that looks like a secret (passwords, API keys),
-   - strips out any text that tries to hijack the AI ("ignore your instructions…"),
-   - wraps the content in a clear "this is DATA, not commands" fence.
-   The cleaned result is saved as a small `improve-context-*.json` file. Helpers that aren't safe to write to, are missing, or don't meet the thresholds are skipped.
+   For each selected target, metamorph reads the target's file and sanitizes it before the model sees it: redact anything resembling a secret, strip text that tries to hijack the model, and wrap the result in an explicit "this is data, not instructions" safeguard. The cleaned output is saved as a small `improve-context-*.json`. Targets that aren't writable, are missing, or fall below the configured thresholds are skipped. This step prepares the model for the task.
 
-2. **Generate** — the AI reads that cleaned context and writes a **draft** change as a `.diff` file, plus a full proposed version of the file. **Nothing on disk is changed yet** — these are just proposals sitting in a folder.
+2. **Generate** — the model reads the cleaned output and writes a draft change as a `.diff`, plus a full proposed file. Nothing on disk changes — these are proposals sitting in a folder.
 
 3. **Approve or reject** — `/metamorph-improve`
-   - Approve → metamorph hands the proposal to the writer (next step).
-   - Reject → the proposal is deleted and metamorph remembers you said no.
+   Approve hands the proposal to the writer (next step). Reject deletes it and records the decision.
 
 4. **Write with backup** — `dist/rollback/writer.js` (`writeWithBackup`)
-   Before changing anything, it double-checks the file is allowed to be written, checks the new content is valid, **makes a backup of the current file**, and then swaps in the new version safely. Because of that backup, `/metamorph-rollback` can undo it later.
+   Confirms the path is writable, validates the new content, backs up the current file, then swaps in the new version atomically. That backup is what lets `/metamorph-rollback` undo the change later.
 
-## Where does metamorph keep its data?
+## Data persistence
 
-Your scores, settings, pending suggestions, and backups need to survive even when the plugin itself updates to a new version. metamorph handles this in `dist/runtime.js`:
+Scores, settings, pending suggestions, and backups must survive plugin updates — and updates replace the program files. `dist/runtime.js` handles this:
 
-- `resolveDataRoot` figures out a stable folder to store data in (separate from the program files, which get replaced on every update).
-- `ensurePersistentData` copies your existing settings and history forward into that folder the first time, so nothing is lost.
+- `resolveDataRoot` resolves a stable data folder, kept separate from the program files that get replaced on every update.
+- `ensurePersistentData` copies existing settings and history forward into that folder on first run, so nothing is lost.
 
-The details are in [plugin-runtime.md](plugin-runtime.md).
+Details in [plugin-runtime.md](plugin-runtime.md).
 
-## Three promises, restated
+## Guarantees
 
-- **Suggest-only** — no file is *ever* changed without you approving it. The setting `"mode": "suggest"` is even force-locked in code so it can't be flipped off by accident.
-- **Local-first** — Layer 1 makes zero network calls and uses zero AI. Your data stays on your machine.
-- **Reversible** — every approved change is backed up first, so you can roll it back.
+- **Suggest-only** — no file is changed without approval. `"mode": "suggest"` is force-locked in code so it can't be flipped off by accident.
+- **Local-first** — Workflow 1 makes zero network calls and uses zero tokens from your coding models. Your data stays on your machine.
+- **Reversible** — every approved change is backed up first, so it can be rolled back.

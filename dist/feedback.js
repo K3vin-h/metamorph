@@ -41,13 +41,27 @@ const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const FEEDBACK_LOG = (pluginRoot) => path.join(pluginRoot, "data", "feedback.log");
 const MAX_ENTRIES = 200;
-const MAX_FEEDBACK_LENGTH = 2000;
+// Documented contract (README, /metamorph-feedback): 500 chars per entry
+const MAX_FEEDBACK_LENGTH = 500;
 function addFeedback(pluginRoot, text) {
     const logPath = FEEDBACK_LOG(pluginRoot);
     fs.mkdirSync(path.dirname(logPath), { recursive: true });
     const trimmed = text.trim().slice(0, MAX_FEEDBACK_LENGTH);
     const entry = `[${new Date().toISOString()}] ${trimmed}\n`;
     fs.appendFileSync(logPath, entry, "utf8");
+    trimFeedbackLog(logPath);
+}
+// Keep the log file itself bounded, not just the read-side slice
+function trimFeedbackLog(logPath) {
+    try {
+        const lines = fs.readFileSync(logPath, "utf8").split("\n").filter((l) => l.trim());
+        if (lines.length <= MAX_ENTRIES)
+            return;
+        fs.writeFileSync(logPath, lines.slice(-MAX_ENTRIES).join("\n") + "\n", "utf8");
+    }
+    catch {
+        // best-effort; next append retries
+    }
 }
 function listFeedback(pluginRoot) {
     const logPath = FEEDBACK_LOG(pluginRoot);

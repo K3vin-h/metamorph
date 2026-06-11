@@ -45,7 +45,8 @@ function globToRegex(pattern) {
     let regex = "";
     for (let i = 0; i < pattern.length;) {
         if (pattern.slice(i, i + 3) === "**/") {
-            regex += "(?:.+/)*";
+            // Unambiguous translation — (?:.+/)* backtracks exponentially on near-misses
+            regex += "(?:[^/]+/)*";
             i += 3;
         }
         else if (pattern.slice(i, i + 2) === "**") {
@@ -66,8 +67,10 @@ function globToRegex(pattern) {
 function matchGlob(pattern, filePath) {
     if (filePath.includes("..") || path.isAbsolute(filePath))
         return false;
+    // Windows: path.relative produces backslash separators; globs are slash-based
+    const normalized = filePath.split("\\").join("/");
     const regex = new RegExp(globToRegex(pattern));
-    return regex.test(filePath);
+    return regex.test(normalized);
 }
 function resolveProjectRoot() {
     const candidates = [

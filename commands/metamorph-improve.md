@@ -22,13 +22,7 @@ Path shorthand — substitute literally in every command/path below:
 
 ## What happens on approval
 
-1. Reads the diff from `$DATA/suggestions/<runId>-<targetId>.diff`
-2. Applies the diff to a temp copy of the target file
-3. Validates the temp copy (frontmatter parses, required keys present, no unclosed code fences)
-4. If validation fails: discards temp, reports error, original untouched
-5. Backs up current file to `$DATA/backups/` (see `/metamorph-rollback`)
-6. Writes the new content atomically
-7. Updates `$DATA/backups/manifest.json`
+The CLI applies the diff to a temp copy, validates it (frontmatter keys, balanced code fences), backs up the current file to `$DATA/backups/`, then writes atomically and updates the backup manifest. Validation failure leaves the original untouched.
 
 ---
 

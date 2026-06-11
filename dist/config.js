@@ -106,6 +106,16 @@ function stripJsoncComments(text) {
     }
     return result;
 }
+// Bound glob lists so a pathological config can't stall permission checks
+const MAX_GLOBS = 100;
+const MAX_GLOB_LENGTH = 256;
+function sanitizeGlobs(value, fallback) {
+    if (!Array.isArray(value))
+        return fallback;
+    return value
+        .filter((g) => typeof g === "string" && g.length > 0 && g.length <= MAX_GLOB_LENGTH)
+        .slice(0, MAX_GLOBS);
+}
 function isValidPrivacyMode(v) {
     return v === "full" || v === "redacted" || v === "off";
 }
@@ -138,7 +148,7 @@ function mergeWithDefaults(raw) {
             mistakeTracking: typeof read.mistakeTracking === "boolean"
                 ? read.mistakeTracking
                 : DEFAULTS.read.mistakeTracking,
-            denyGlobs: Array.isArray(read.denyGlobs) ? read.denyGlobs.filter((g) => typeof g === "string") : DEFAULTS.read.denyGlobs,
+            denyGlobs: sanitizeGlobs(read.denyGlobs, DEFAULTS.read.denyGlobs),
             trackCursor: typeof read.trackCursor === "boolean" ? read.trackCursor : DEFAULTS.read.trackCursor,
             trackCodex: typeof read.trackCodex === "boolean" ? read.trackCodex : DEFAULTS.read.trackCodex,
             ...(typeof read.cursorRoot === "string" ? { cursorRoot: read.cursorRoot } : {}),
@@ -150,8 +160,8 @@ function mergeWithDefaults(raw) {
                 skills: typeof targets.skills === "boolean" ? targets.skills : DEFAULTS.write.targets.skills,
                 claudeMd: parseClaudeMdScope(targets.claudeMd),
             },
-            allow: Array.isArray(write.allow) ? write.allow.filter((g) => typeof g === "string") : DEFAULTS.write.allow,
-            deny: Array.isArray(write.deny) ? write.deny.filter((g) => typeof g === "string") : DEFAULTS.write.deny,
+            allow: sanitizeGlobs(write.allow, DEFAULTS.write.allow),
+            deny: sanitizeGlobs(write.deny, DEFAULTS.write.deny),
         },
         style: {
             deriveGuide: typeof style.deriveGuide === "boolean" ? style.deriveGuide : DEFAULTS.style.deriveGuide,
@@ -191,7 +201,9 @@ function writeConfig(pluginRoot, config) {
     const configPath = path.join(pluginRoot, "config.jsonc");
     const json = JSON.stringify(config, null, 2);
     fs.mkdirSync(path.dirname(configPath), { recursive: true });
-    fs.writeFileSync(configPath, json, "utf8");
+    const tmp = configPath + ".tmp";
+    fs.writeFileSync(tmp, json, "utf8");
+    fs.renameSync(tmp, configPath);
 }
 const SAFE_KEY_RE = /^[a-zA-Z][a-zA-Z0-9_]*$/;
 function setConfigValue(pluginRoot, keyPath, rawValue) {

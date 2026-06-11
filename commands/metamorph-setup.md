@@ -52,6 +52,8 @@ Current: [redacted] >
 After selection, print a one-line explanation of what is and is NOT stored.
 
 If user selects **full**, also note: full mode stores scrubbed tool inputs for every call — larger `profile.json` and slower analysis. Recommend **redacted** unless they rely on mistake-pattern flags from transcript text. To migrate later: `config-set read.transcripts redacted`.
+
+**3. Write targets**
 ```
 Write targets — which file types may metamorph propose edits to?
   agents   (current: enabled ) — toggle? [y/N] 

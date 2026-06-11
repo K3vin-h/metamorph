@@ -1,105 +1,60 @@
 # metamorph
 
-**Version 1.2.7**
+**Version 1.2.8**
 
-metamorph is a **local-first AI-agent observability and improvement tool** for **Claude Code**, **Cursor**, and **Codex**. It observes how you actually use your **agents**, **skills**, and **CLAUDE.md** files, builds a text **dashboard** that scores each target, and proposes small file edits as **diffs** you review. Suggest-only with one-level rollback, no telemetry, and tokens spent only when you ask for an improvement.
+metamorph helps you understand and improve the agent, skill, and instruction files you use with Claude Code, Cursor, and Codex.
 
-**Local-first & private:** observation, scoring, and the dashboard run entirely on your machine — no network calls, no telemetry. See [docs/privacy-model.md](docs/privacy-model.md).
-
-**Suggest-only by design:** metamorph never auto-applies edits. You review every diff first, every applied change is backed up, and `/metamorph-rollback` undoes it.
-
-**Runtime-only repo:** `main` contains the files users install and run, plus `tests/` and CI that validate the shipped `dist/` artifact. TypeScript source, source maps, and build-only files are intentionally not shipped in this branch.
-
-**Documentation:**
-
-- [docs/architecture.md](docs/architecture.md) — two-layer design and data flow
-- [docs/scoring-model.md](docs/scoring-model.md) — how scores and flags are computed
-- [docs/privacy-model.md](docs/privacy-model.md) — read modes, scrubbing, deny globs
-- [docs/plugin-runtime.md](docs/plugin-runtime.md) — cross-host packaging and data persistence
-- [docs/security-review.md](docs/security-review.md) — threat model and controls
-
----
-
-## Quick reference
-
-| Goal | Command |
-|------|---------|
-| Install (Claude Code) | `/plugin marketplace add K3vin-h/metamorph` then `/plugin install metamorph` |
-| Install (Cursor) | Clone to `~/.cursor/plugins/local/metamorph/` and reload |
-| Install (Codex) | `codex plugin marketplace add K3vin-h/metamorph` then enable in plugin directory |
-| First-time setup | `/metamorph-setup` |
-| View dashboard | `/metamorph-report` |
-| Improve agents or skills | `/metamorph` |
-| Check status | `/metamorph --status` |
-| Undo an approved change | `/metamorph-rollback --list` |
-
----
-
-## Key terms
-
-| Term | Meaning |
-|------|---------|
-| **Agent** | A specialized assistant definition Claude can invoke (e.g. `architect`, `code-reviewer`) |
-| **Skill** | An instruction file Claude loads for specific tasks (e.g. `tdd-workflow`) |
-| **CLAUDE.md** | Project-level instructions that guide Claude's behavior |
-| **Session** | One work period in Claude Code, from open to close |
-| **Hook** | An automatic script that runs at session start or end — no AI involved |
-| **Token** | A unit of AI usage; only the improvement step consumes tokens |
-| **Diff** | A line-by-line list of what would change in a file |
-| **Flag** | A short label on the dashboard (`inactive`, `underused`, `healthy`, etc.) explaining a finding |
-| **Score** | A number from 0–100; lower usually means more room to improve |
-| **Warm-up** | Initial sessions where metamorph collects data before marking the dashboard `ready` (default: 5) |
-
----
+It watches local session activity, builds a plain-text report, scores each target, and proposes small diffs when you ask for improvements. It does not send telemetry, does not run model calls in the background, and does not edit files without approval.
 
 ## What metamorph does
 
-1. **Observes** your Claude Code sessions through background hooks (local parsing only — no AI).
-2. **Scores** each agent and skill based on real usage patterns.
-3. **Publishes** a text report (`report.md`) with scores, flags, and warm-up status.
-4. **Proposes** targeted diffs when you run `/metamorph`.
-5. **Validates, backs up, and writes** only after you explicitly approve.
+Working with coding assistants, you usually collect a few kinds of configuration:
 
-metamorph does **not** run continuously in the background, serve an HTML dashboard, or modify files without consent.
+- **Agents** - specialized assistant definitions for focused work.
+- **Skills** - instruction files loaded for specific tasks.
+- **CLAUDE.md** - standing project or global instructions.
 
----
+Some of these files are useful, some drift out of date, and some are never used. metamorph makes that visible.
 
-## How it works
+It has two workflows:
 
-### Layer 1 — Background pipeline (zero tokens)
+- **Watcher** - runs from hooks, parses local session activity, updates scores, and writes `report.md`. This uses zero tokens.
+- **Improver** - runs when you type `/metamorph`, prepares a small context for selected targets, and asks the model to draft diffs. This is the only token-using step.
 
-**Hooks** are small Node.js scripts registered in `hooks/hooks.json`. They fire automatically:
+## Guarantees
 
-| Hook | When | What it does |
-|------|------|--------------|
-| **SessionStart** | Session opens | Refreshes `report.md`; prints a compact 2-line status (session count, flagged count, top target) |
-| **SessionEnd** | Session closes | Parses new transcript data; updates scores when new sessions are found; refreshes the report and style profile only if new data was ingested |
+- **Local-first** - observation, scoring, and report generation happen on your machine.
+- **Suggest-only** - metamorph proposes diffs; you decide what gets applied.
+- **Reversible** - approved changes are backed up before the target file is replaced.
+- **Runtime-focused** - this branch ships the installable plugin runtime in `dist/`.
 
-Hook timeouts: SessionStart **10s**, SessionEnd **60s**. Errors go to `data/hook-errors.log` and do not prevent Claude Code from closing normally.
+## Documentation
 
-### Layer 2 — Improvement pipeline (uses tokens)
+- [docs/architecture.md](docs/architecture.md) - structure and data flow
+- [docs/scoring-model.md](docs/scoring-model.md) - score and flag calculation
+- [docs/privacy-model.md](docs/privacy-model.md) - read modes, scrubbing, and deny globs
+- [docs/plugin-runtime.md](docs/plugin-runtime.md) - packaging and data persistence
+- [docs/security-review.md](docs/security-review.md) - threat model and controls
 
-When you run `/metamorph`:
+## Quick Reference
 
-1. **CLI helpers** print stats and target tables without loading the full analysis file into chat.
-2. You select targets (`top 3`, specific IDs, or `all` — capped at `maxSuggestionsPerRun`, default **3**).
-3. **`prepare-improve-batch`** builds a small context file (~1–3 KB) per target.
-4. **`metamorph-diff` subagents** run **in parallel** (Haiku model) — each reads one context file and writes a unified diff.
-5. You review diffs and approve with `all`, specific IDs, or `none` (or later via `/metamorph-improve`).
-6. Approved changes are validated, backed up, and written atomically.
-
-This is the **only step that uses the AI model** and consumes tokens.
-
----
+| Goal | Command |
+|------|---------|
+| Install in Claude Code | `/plugin marketplace add K3vin-h/metamorph` then `/plugin install metamorph` |
+| Install in Cursor | Clone to `~/.cursor/plugins/local/metamorph/` and reload |
+| Install in Codex | `codex plugin marketplace add K3vin-h/metamorph` then enable the plugin |
+| First-time setup | `/metamorph-setup` |
+| View report | `/metamorph-report` |
+| Improve agents or skills | `/metamorph` |
+| Check status | `/metamorph --status` |
+| Undo an approved change | `/metamorph-rollback --list` |
 
 ## Requirements
 
 | Requirement | Details |
 |-------------|---------|
-| **Claude Code** | Plugin and hook support enabled |
-| **Node.js 18+** | Runs metamorph's background scripts |
-
----
+| Claude Code | Plugin and hook support enabled |
+| Node.js 18+ | Runs the local runtime scripts |
 
 ## Installation
 
@@ -117,29 +72,27 @@ To update:
 /plugin update metamorph
 ```
 
-Your settings and data in `${CLAUDE_PLUGIN_DATA}` are preserved. After updating, start a new session or run `/metamorph-report` to refresh the dashboard format.
+Settings and data in `${CLAUDE_PLUGIN_DATA}` are preserved. After updating, start a new session or run `/metamorph-report` to refresh the report.
 
 ### Cursor
 
-Install from GitHub (clone or download), then load locally:
+Clone the plugin into Cursor's local plugin folder:
 
 ```bash
 git clone https://github.com/K3vin-h/metamorph.git ~/.cursor/plugins/local/metamorph
 ```
 
-Restart Cursor (or **Developer: Reload Window**). Commands (`/metamorph`, `/metamorph-setup`, …), hooks, and skills load from `.cursor-plugin/plugin.json`.
+Restart Cursor or run **Developer: Reload Window**. Commands, hooks, and skills load from `.cursor-plugin/plugin.json`.
 
-From Claude Code, `/metamorph-setup` can also link the plugin into `~/.cursor/plugins/local/metamorph/` automatically.
+From Claude Code, `/metamorph-setup` can also link the plugin into `~/.cursor/plugins/local/metamorph/`.
 
 ### Codex
 
-Add the GitHub marketplace, then install from the plugin directory:
+Add the marketplace:
 
 ```bash
 codex plugin marketplace add K3vin-h/metamorph
 ```
-
-Codex reads `.claude-plugin/marketplace.json` (legacy-compatible) and requires `.codex-plugin/plugin.json` at the plugin root.
 
 For a local checkout during development:
 
@@ -147,83 +100,73 @@ For a local checkout during development:
 codex plugin marketplace add /absolute/path/to/metamorph
 ```
 
-Or run `/metamorph-setup` from Claude Code to link the plugin into `~/.agents/plugins/metamorph/` and register a personal marketplace entry.
+Restart Codex and enable **metamorph** from the plugin picker. `/metamorph` runs improvements; session hooks run automatically.
 
-Restart Codex and enable **metamorph** from the plugin picker. Use `/metamorph` to run improvements; `SessionStart`/`SessionEnd` hooks run automatically.
+## First-Time Setup
 
----
-
-## First-time setup
+Run:
 
 ```text
 /metamorph-setup
 ```
 
-The wizard configures:
+The setup wizard configures:
 
 | Setting | What it controls |
 |---------|------------------|
-| **Read scope** | Which Claude config folders to analyze: global, project, or both |
-| **Transcript privacy** | How much session data to store: `full`, `redacted`, or `off` |
-| **Write targets** | Whether metamorph may suggest edits to agents, skills, and/or CLAUDE.md |
-| **Warm-up sessions** | Sessions to collect before the dashboard shows `ready` (default: **5**) |
-| **Flag threshold** | Scores below this value receive the `underused` flag (default: **40**) |
-| **Deny-read globs** | File path patterns metamorph must never read (e.g. `**/*.env*`) |
+| Read scope | Global config, project config, or both |
+| Transcript privacy | `full`, `redacted`, or `off` |
+| Write targets | Whether metamorph may suggest edits to agents, skills, and/or CLAUDE.md |
+| Warm-up sessions | Sessions collected before the report shows `ready` |
+| Flag threshold | Score threshold for the `underused` flag |
+| Deny-read globs | File patterns metamorph must never read |
 
-**Shipped defaults** (`config.jsonc`):
+Shipped defaults:
 
-- Transcripts: `redacted` (metadata only — not full chat text)
+- Transcripts: `redacted`
 - Agent and skill suggestions: enabled
 - CLAUDE.md suggestions: disabled
 - Read scope: `both`
+- Warm-up sessions: `5`
 
-Settings save to `${CLAUDE_PLUGIN_DATA}/config.jsonc`. Run setup again anytime; use `--reset` to restore defaults first.
+Settings are saved to `${CLAUDE_PLUGIN_DATA}/config.jsonc`. Run setup again anytime, or use `/metamorph-setup --reset` to restore defaults first.
 
----
-
-## Typical workflow
+## Typical Workflow
 
 1. Install the plugin and run `/metamorph-setup`.
-2. Use Claude Code normally for several sessions (at least **5** by default).
-3. Run `/metamorph-report` to view the dashboard.
-4. Run `/metamorph`, select targets, review diffs, and approve what you want.
+2. Use Claude Code normally for several sessions.
+3. Run `/metamorph-report` to view the report.
+4. Run `/metamorph`, select targets, review diffs, and approve only what you want.
 
-| During warm-up | After warm-up |
-|----------------|---------------|
-| Dashboard shows `warm-up 2/5` (example) | Dashboard shows `ready` |
-| Session start reports sessions remaining | Session start suggests `/metamorph` |
-| `/metamorph` works if session data exists | Scores are generally more reliable |
+During warm-up, the report shows progress such as `warm-up 2/5`. After enough sessions, it shows `ready`. Warm-up improves score quality, but it does not block commands.
 
-Warm-up improves data quality; it is not a hard lock on commands.
+## How It Works
 
----
+### Workflow 1 - Watcher
 
-## Efficient usage (token savings)
+Hooks are registered in `hooks/hooks.json`.
 
-| Practice | Effect |
-|----------|--------|
-| `/metamorph-report` | Zero LLM — dashboard only; prints a clickable `report.md` link |
-| `/metamorph --target <id>` | Skip stats tables + multi-target prep when you know the target |
-| Actionable targets only | Default interactive flow uses `improve-targets-actionable` (excludes inactive targets) |
-| `improve.skipNeverInvoked: true` | Batch prepare skips inactive agents/skills (default in 1.2.7) |
-| `transcripts: redacted` | Smaller cache — default; use `full` only if you need mistake text |
-| Prune unused agents/skills | Biggest routing win — remove from `~/.claude/agents/` or `~/.cursor/skills-cursor/` |
+| Hook | When | What it does |
+|------|------|--------------|
+| `SessionStart` | Session opens | Refreshes `report.md` and prints a compact status |
+| `SessionEnd` | Session closes | Parses new transcript data, updates scores, and refreshes reports when new data exists |
 
-**Config migration** (if your runtime config still has `transcripts: full`):
+The watcher is plain Node.js code. It parses local files, updates `analysis.json`, and writes `report.md`. It does not call the model.
 
-```bash
-node "${CLAUDE_PLUGIN_ROOT}/dist/index.js" config-set read.transcripts redacted
-```
+Hook timeouts are 10 seconds for `SessionStart` and 60 seconds for `SessionEnd`. Errors are written to `data/hook-errors.log`.
 
-**After upgrading to 1.2.7**, run one `session-end` to re-parse transcripts with improved Cursor `Task` / `Read` skill tracking:
+### Workflow 2 - Improver
 
-```bash
-node "${CLAUDE_PLUGIN_ROOT}/dist/index.js" session-end
-```
+When you run `/metamorph`:
 
-**Recommended improve targets** (when you have usage data): agents/skills with score ≥ 30 and non-`inactive` flags — e.g. `code-reviewer`, `security-reviewer`, `graphify`. Skip `architect`-class agents until you actually invoke them.
+1. metamorph prints the current status and target list.
+2. You choose targets, such as `top 3`, specific IDs, or `all`.
+3. `prepare-improve-batch` builds a small context file per target.
+4. The `metamorph-diff` subagent drafts one diff per target.
+5. You review the diffs.
+6. Approved changes are validated, backed up, and written.
 
----
+This is the only workflow that uses the AI model.
 
 ## Commands
 
@@ -231,23 +174,21 @@ node "${CLAUDE_PLUGIN_ROOT}/dist/index.js" session-end
 
 | Command | Description |
 |---------|-------------|
-| `/metamorph` | Interactive: actionable targets → diffs → approval |
-| `/metamorph --status` | Warm-up progress, recommended target IDs, top flags |
-| `/metamorph --target <id>` | Improve a single target directly (preferred for token savings) |
-| `/metamorph-report` | Refresh and display `report.md` (zero LLM) |
+| `/metamorph` | Interactive improvement flow |
+| `/metamorph --status` | Warm-up progress, recommended targets, and top flags |
+| `/metamorph --target <id>` | Improve one target directly |
+| `/metamorph-report` | Refresh and display `report.md` |
 
-**Target IDs:** agent/skill names (`architect`, `backend-patterns`), or `global` / `local` for CLAUDE.md.
-
-**Selection in `/metamorph`:** `top N`, `all`, or space-separated IDs. Lowest-scoring targets are kept when the selection exceeds `maxSuggestionsPerRun`.
+Target IDs are agent or skill names, or `global` / `local` for CLAUDE.md.
 
 ### Configuration
 
 | Command | Description |
 |---------|-------------|
-| `/metamorph-setup` | Setup wizard |
-| `/metamorph-setup --reset` | Reset defaults, then wizard |
+| `/metamorph-setup` | Run the setup wizard |
+| `/metamorph-setup --reset` | Reset defaults, then run setup |
 | `/metamorph-config show` | Display current settings |
-| `/metamorph-config set key=value` | Update one setting (dot notation for nested keys) |
+| `/metamorph-config set key=value` | Update one setting |
 
 Examples:
 
@@ -259,20 +200,18 @@ Examples:
 /metamorph-config set write.targets.claudeMd=both
 ```
 
-### Approval and rollback
+### Approval and Rollback
 
 | Command | Description |
 |---------|-------------|
-| `/metamorph-improve --list` | List pending suggestions by run ID |
-| `/metamorph-improve --approve <runId>-<targetId>` | Apply one approved diff |
-| `/metamorph-improve --approve all` | Apply all pending from the latest run |
+| `/metamorph-improve --list` | List pending suggestions |
+| `/metamorph-improve --approve <id>` | Apply one approved suggestion |
+| `/metamorph-improve --approve all` | Apply all pending suggestions from the latest run |
 | `/metamorph-improve --reject <id>` | Discard a suggestion |
 | `/metamorph-improve --reject all` | Discard all pending suggestions |
 | `/metamorph-rollback --list` | List restorable backups |
-| `/metamorph-rollback --file <path>` | Restore a file to its pre-edit backup |
+| `/metamorph-rollback --file <path>` | Restore one file |
 | `/metamorph-rollback --run <runId>` | Restore all restorable files from one run |
-
-**Suggestion ID example:** `run-1717000000000-abc123def456-architect`
 
 ### Feedback
 
@@ -282,132 +221,61 @@ Examples:
 /metamorph-feedback --clear
 ```
 
-Up to **500 characters** per entry via the slash command. Feedback is sanitized and marked as untrusted before it influences suggestions.
+Feedback is sanitized and treated as untrusted reference data before it influences suggestions.
 
----
-
-## Dashboard and scoring
-
-### Reading the report
+## Report and Scoring
 
 Run `/metamorph-report` or open `${CLAUDE_PLUGIN_DATA}/report.md`.
 
-```text
-# metamorph · ready
-124 sessions · 44 tools · 0 agent runs · 0 skill loads · redacted
-ts 42% · py 28%
+The report is a plain-text dashboard with session counts, language mix, target scores, and flags. There is no HTML dashboard.
 
-_Score: 0–30 needs attention · 31–70 moderate · 71–100 healthy_
-_Flags: inactive=unused · underused=low score · healthy=active · tool-gap=declared tool unused · stale-doc=inactive section · correction=repeated fixes_
-
-## Agents (25)
-
-┌──────────────────────────────┬──────────────┬──────────────┐
-│              id              │    score     │     flag     │
-├──────────────────────────────┼──────────────┼──────────────┤
-│  architect                   │    10/100    │  inactive   │
-│  researcher                  │    40/100    │  underused  │
-└──────────────────────────────┴──────────────┴──────────────┘
-```
-
-There is no HTML dashboard — only this plain-text report with ASCII tables.
-
-### Score composition
-
-Each agent or skill receives a weighted score from **0 to 100**:
+Each agent or skill receives a score from 0 to 100:
 
 | Factor | Weight | What it measures |
 |--------|--------|------------------|
-| Invocation frequency | 40% | How often you use it vs total agent runs or skill loads |
-| Tool utilization | 30% | Declared tools vs tools actually observed in sessions |
-| Section coverage | 20% | Whether documented sections align with your workflow |
-| Skill apply rate | 10% | Skills only: times loaded vs times actually applied |
+| Invocation frequency | 40% | How often the target is used |
+| Tool utilization | 30% | Declared tools compared with observed tool use |
+| Section coverage | 20% | Whether documented sections match observed work |
+| Skill apply rate | 10% | Skills only: loads compared with actual application |
 
-### Flags
+Common flags include:
 
 | Flag | Meaning |
 |------|---------|
-| `—` | No primary issue |
 | `inactive` | No observed use, or a skill loaded but was never applied |
-| `underused` | Used at least once, but score is below `flagThreshold` (default: below 40) |
-| `healthy` | Score is 80 or higher and the target appears active |
-| `tool-gap` | A declared tool was not seen in your sessions |
-| `stale-doc` | A documentation section may not match your workflow (high confidence in `full` privacy mode) |
-| `stale-doc?` | Same as `stale-doc`, but lower confidence (`redacted` or `off` mode) |
-| `correction` | Repeated correction patterns detected |
+| `underused` | Used, but below the configured score threshold |
+| `healthy` | Active with a score of 80 or higher |
+| `tool-gap` | A declared tool was not observed in sessions |
+| `stale-doc` | A documented section may not match actual use |
+| `correction` | Repeated correction patterns were detected |
 
-**Note:** `stale-doc` and `stale-doc?` flags appear only after at least **5 invocations**, to limit false positives.
-
----
+See [docs/scoring-model.md](docs/scoring-model.md) for the full model.
 
 ## Privacy
 
+The default transcript mode is `redacted`.
+
 | Mode | What is stored |
 |------|----------------|
-| **`redacted`** (default) | Metadata only: tool names, file extensions, hashed path fragments, timestamps — not full prompts or file contents |
-| **`full`** | Complete transcript bodies and tool inputs |
-| **`off`** | Aggregate counts with minimal per-event detail |
+| `redacted` | Metadata such as tool names, file extensions, hashed path fragments, and timestamps |
+| `full` | Complete transcript bodies and tool inputs |
+| `off` | Aggregate counts with minimal per-event detail |
 
-metamorph applies best-effort secret scrubbing before storage. Use deny-read globs for sensitive files. Scrubbing is not a guarantee.
+metamorph applies best-effort secret scrubbing before storage. Use deny-read globs for sensitive files. Scrubbing reduces risk, but it is not a guarantee.
 
-Session data included in improvement context is wrapped in **`[UNTRUSTED DATA]`** blocks. Subagents are instructed to treat that content as reference data, not as commands to follow.
+Session data included in improvement context is wrapped as untrusted data. The model is instructed to treat it as reference material, not as instructions.
 
----
-
-## Mistake tracking
-
-Enabled by default (`read.mistakeTracking: true`). Helps metamorph suggest guardrails when you repeatedly correct similar issues.
-
-| Counts | Does not count |
-|--------|----------------|
-| Tool completes successfully, then you send a fix message | Declined tool calls |
-| You reject a suggestion with `/metamorph-improve --reject` | Failed commands |
-| | Fix messages with no successful tool step immediately before |
-
-Disable: `/metamorph-config set read.mistakeTracking=false`
-
-Only a compact slice (max 3 patterns, 2 examples, 80 characters each) is passed to the improvement step to limit token use.
-
----
-
-## What happens when you approve
+## What Happens When You Approve
 
 1. The diff is applied to a temporary copy of the target file.
-2. The copy is validated (required frontmatter keys, balanced code fences).
-3. If validation passes: the original file is backed up, then replaced.
-4. If validation fails: the original file is **unchanged**.
+2. The copy is validated.
+3. If validation passes, the original file is backed up.
+4. The validated copy replaces the original file.
+5. If validation fails, the original file is unchanged.
 
-**Rollback:** one backup per file (the version from immediately before metamorph's last edit). If filenames collide, use the full path (e.g. `agents/architect.md`).
+Rollback keeps one backup per file: the version from immediately before metamorph's last edit.
 
----
-
-## Configuration reference
-
-| Setting | Values | Default |
-|---------|--------|---------|
-| `mode` | `suggest` only | Cannot auto-apply |
-| `warmupSessions` | 1–50 | 5 |
-| `flagThreshold` | 0–100 | 40 |
-| `maxSuggestionsPerRun` | 1–20 | 3 |
-| `read.scope` | `global`, `project`, `both` | `both` |
-| `read.transcripts` | `full`, `redacted`, `off` | `redacted` |
-| `read.mistakeTracking` | `true`, `false` | `true` |
-| `read.trackCursor` | `true`, `false` | `true` |
-| `read.trackCodex` | `true`, `false` | `true` |
-| `improve.skipNeverInvoked` | `true`, `false` | `true` |
-| `improve.minScore` | 0–100 | 30 |
-| `improve.minInvocations` | 0–100 | 1 |
-| `write.targets.agents` | `true`, `false` | `true` |
-| `write.targets.skills` | `true`, `false` | `true` |
-| `write.targets.claudeMd` | `false`, `global`, `local`, `both` | `false` |
-| `write.allow` | path globs | `agents/*`, `skills/*/SKILL.md` |
-| `write.deny` | path globs | `[]` |
-
-Changes take effect on the next hook run. The config file supports comments (JSONC format).
-
----
-
-## Data storage
+## Data Storage
 
 Plugin data lives under `${CLAUDE_PLUGIN_DATA}`, typically:
 
@@ -418,69 +286,87 @@ Plugin data lives under `${CLAUDE_PLUGIN_DATA}`, typically:
 | Path | Purpose |
 |------|---------|
 | `config.jsonc` | Settings |
-| `report.md` | Text dashboard |
+| `report.md` | Text report |
 | `data/analysis.json` | Scores and flags |
-| `data/profile.json` | Session cache (up to 500 sessions) |
+| `data/profile.json` | Session cache |
 | `data/feedback.log` | User feedback entries |
 | `data/hook-errors.log` | Hook error log |
 | `data/style-profile.json` | Style patterns for suggested edits |
 | `data/mistake-feedback.jsonl` | Mistake and rejection events |
-| `suggestions/` | Pending diffs awaiting approval |
+| `suggestions/` | Pending diffs |
 | `backups/` | Pre-edit file copies |
 
-**Reads from:** `~/.claude/agents/`, `~/.claude/skills/`, `~/.claude/projects/` (transcripts).
+metamorph reads configured agent, skill, CLAUDE.md, and transcript paths. It writes to agent, skill, and CLAUDE.md paths only after approval and only where settings allow.
 
-**Writes to:** agent, skill, and CLAUDE.md paths only after approval, and only where settings permit.
+## Configuration Reference
 
----
+| Setting | Values | Default |
+|---------|--------|---------|
+| `mode` | `suggest` only | Cannot auto-apply |
+| `warmupSessions` | 1-50 | 5 |
+| `flagThreshold` | 0-100 | 40 |
+| `maxSuggestionsPerRun` | 1-20 | 3 |
+| `read.scope` | `global`, `project`, `both` | `both` |
+| `read.transcripts` | `full`, `redacted`, `off` | `redacted` |
+| `read.mistakeTracking` | `true`, `false` | `true` |
+| `read.trackCursor` | `true`, `false` | `true` |
+| `read.trackCodex` | `true`, `false` | `true` |
+| `improve.skipNeverInvoked` | `true`, `false` | `true` |
+| `improve.minScore` | 0-100 | 30 |
+| `improve.minInvocations` | 0-100 | 1 |
+| `write.targets.agents` | `true`, `false` | `true` |
+| `write.targets.skills` | `true`, `false` | `true` |
+| `write.targets.claudeMd` | `false`, `global`, `local`, `both` | `false` |
+| `write.allow` | path globs | `agents/*`, `skills/*/SKILL.md` |
+| `write.deny` | path globs | `[]` |
+
+Changes take effect on the next hook run. The config file supports JSONC comments.
 
 ## Security
 
-- **Suggest-only** — no autonomous file writes.
-- **Path confinement** — writes restricted to allowed directories; symlink escapes blocked.
-- **Input sanitization** — feedback and mistake data scrubbed and marked untrusted before LLM context.
-- **Validation** — frontmatter and structure checks before replacing files.
-- **Checksums** — rollback can detect manual edits since metamorph's last write.
-
----
+- **Suggest-only** - no autonomous file writes.
+- **Path confinement** - writes are restricted to allowed directories.
+- **Input sanitization** - feedback and mistake data are scrubbed and marked untrusted before model use.
+- **Validation** - proposed files are checked before replacement.
+- **Checksums** - rollback can detect manual edits since metamorph's last write.
 
 ## Troubleshooting
 
 | Issue | Solution |
 |-------|----------|
-| Outdated dashboard format | `/metamorph-report` or start a new session |
+| Outdated report format | Run `/metamorph-report` or start a new session |
 | No data available | Complete at least one full Claude Code session |
 | Hook errors | Check `data/hook-errors.log` |
-| Validation failed on approve | Original file unchanged; review the error message |
-| Rollback restored wrong file | Use full path: `/metamorph-rollback --file agents/architect.md` |
-| Unreliable scores | Allow more sessions; default warm-up is 5 |
+| Validation failed on approval | The original file was left unchanged |
+| Rollback restored the wrong file | Use the full path, such as `/metamorph-rollback --file agents/architect.md` |
+| Scores look unreliable | Allow more sessions; default warm-up is 5 |
 
----
-
-## Runtime reference
+## Runtime Reference
 
 Source: [github.com/K3vin-h/metamorph](https://github.com/K3vin-h/metamorph)
 
-This branch is the installable plugin. It ships compiled runtime JavaScript in `dist/` and omits source, tests, and build-only files.
+CLI:
 
-CLI: `node "${CLAUDE_PLUGIN_ROOT}/dist/index.js" <command>`
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/dist/index.js" <command>
+```
+
+Useful runtime commands:
 
 | Command | Purpose |
 |---------|---------|
 | `session-start` / `session-end` | Run hooks manually |
-| `report-refresh` / `report-print` | Regenerate `report.md`; `report-print` also prints a clickable `report.md` link and dashboard |
+| `report-refresh` / `report-print` | Regenerate or print `report.md` |
 | `improve-stats` / `improve-targets` / `improve-status` | Improve-flow output |
-| `prepare-improve-batch <ids…>` | Build context files (shared run ID) |
+| `prepare-improve-batch <ids...>` | Build context files for selected targets |
 | `prepare-improve <id> [runId]` | Prepare one target |
 | `improve-approve` / `improve-reject` / `improve-list` | Suggestion lifecycle |
-| `config-set` / `config-write` | Config updates (write max 64KB) |
+| `config-set` / `config-write` | Config updates |
 | `feedback-add` / `feedback-list` / `feedback-clear` | Feedback log |
 | `rollback-list` / `rollback-file` / `rollback-run` | Backup restore |
 
-Bundled subagent: `agents/metamorph-diff.md` (parallel diff generation for `/metamorph`).
-
----
+Bundled subagent: `agents/metamorph-diff.md`.
 
 ## License
 
-MIT — see the [GitHub repository](https://github.com/K3vin-h/metamorph).
+MIT. See the [GitHub repository](https://github.com/K3vin-h/metamorph).
